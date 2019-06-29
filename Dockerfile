@@ -5,7 +5,7 @@ COPY . .
 
 RUN GO111MODULE=on go get ./...
 RUN GO111MODULE=on go generate ./...
-RUN GO111MODULE=on GOOS=linux GOARCH=386 go build -o gql-server server/server.go
+RUN GO111MODULE=on GOOS=linux GOARCH=386 go build -o gql-server -ldflags "-X github.com/meinto/gqlgen-starter/chrome.AddExecPathInBuild=yes" server/server.go
 
 
 FROM chromedp/headless-shell:74.0.3729.1

@@ -12,13 +12,17 @@ import (
 	"github.com/meinto/gqlgen-starter/model"
 )
 
+var AddExecPathInBuild string = "no"
+
 func CreateContext() (context.Context, context.CancelFunc) {
 	opts := []cdp.ExecAllocatorOption{
 		cdp.NoFirstRun,
 		cdp.NoDefaultBrowserCheck,
 		cdp.Headless,
 		cdp.DisableGPU,
-		cdp.ExecPath("/headless-shell/headless-shell"),
+	}
+	if AddExecPathInBuild == "yes" {
+		opts = append(opts, cdp.ExecPath("/headless-shell/headless-shell"))
 	}
 	ctx, _ := cdp.NewExecAllocator(context.Background(), opts...)
 	ctx, _ = cdp.NewContext(ctx, cdp.WithDebugf(log.Printf))
