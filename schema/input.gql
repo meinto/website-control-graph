@@ -1,0 +1,14 @@
+input Action {
+  navigate: String
+  sleep: Int
+  waitVisible: String
+  sendKeys: Input
+  click: String 
+  evalJS: String
+}
+
+# helper types
+input Input {
+  selector: String!
+  value: String!
+}

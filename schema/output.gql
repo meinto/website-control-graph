@@ -1,0 +1,6 @@
+type Output {
+  key: String!
+  value: String!
+  index: Int!
+  selector: String!
+}

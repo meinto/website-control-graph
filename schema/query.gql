@@ -1,3 +1,6 @@
 type Query {
-  hello(name: String!): String!
+  control(
+    actions: [Action]
+    outputMap: [WebsiteElement]
+  ): [Output]
 }
