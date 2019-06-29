@@ -5,10 +5,16 @@ input Action {
   sendKeys: Input
   click: String 
   evalJS: String
+  store: Selector
 }
 
 # helper types
 input Input {
   selector: String!
   value: String!
+}
+
+input Selector {
+  attribute: String
+  element: String!
 }

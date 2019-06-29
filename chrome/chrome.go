@@ -42,14 +42,18 @@ func Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Ou
 
 			num := fields.Elem().NumField()
 
+			tmp := make([]*string, 0)
+
 			for i := 0; i < num; i++ {
 				field := fields.Elem().Field(i)
 				value := values.Elem().Field(i)
-				if !value.IsNil() {
-					fmt.Print("Type:", field.Type, ",", field.Name, "=", value.Elem().String(), "\n")
 
+				if !value.IsNil() {
 					switch field.Name {
 					case "Navigate":
+						// url := *action.Navigate
+						// r := regexp.Compile("(\$[0-9]+)")
+						// url = fmt.Sprintf(url)
 						tasks = append(tasks, cdp.Navigate(value.Elem().String()))
 						break
 					case "Sleep":
@@ -73,6 +77,18 @@ func Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Ou
 						js := *action.EvalJs
 						var res []byte
 						tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
+						break
+					case "Store":
+						selector := *action.Store
+						selectorJS := fmt.Sprintf(`document.querySelector("%s")`, selector.Element)
+						if selector.Attribute != nil {
+							selectorJS += fmt.Sprintf(`.getAttribute("%s")`, selector.Attribute)
+						} else {
+							selectorJS += ".innerHTML"
+						}
+						var res string
+						tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
+						tmp = append(tmp, &res)
 						break
 					}
 				}
