@@ -1,74 +1,99 @@
-# GqlGen Starter Project
+# Website Control Graph
 
-This is a quickstart project for [gqlgen](https://github.com/99designs/gqlgen).
+Website Control Graph is a webscraper which allows you to control websites via graphql.
 
 ## Setup
 
 ```bash
-git clone https://github.com/meinto/gqlgen-starter.git
-cd gqlgen-starter
+git clone https://github.com/meinto/website-control-graph.git
+cd website-control-graph
 go run github.com/99designs/gqlgen
 go run server/server.go
 ```
 
 ## Test it
 
-Open localhost:8080 and copy-paste the query or mutation
+Open localhost:8080 and copy-paste the query. You will get the `h1` and `h2` headlines of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program) as result.
 
 ```
 query {
-  hello(name: "Lars")
-}
-``` 
-
-```
-mutation {
-  foo {
-    bar
+  control(
+    actions:[
+      {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
+      {waitVisible:"h1"}
+    ]
+  	outputMap: [
+      {
+        selector: "h1"
+        outKey: "h1-list"
+      }
+      {
+        selector: "h2 .mw-headline"
+        outKey: "h2-list"
+      }
+    ]
+  ) {
+    value
   }
 }
 ```
 
-## Start your project
+## Actions
 
-The project structure is like follows:
+The action type consists of different properties which you can use as input for your query. All actions will be executed as a queue.
 
 ```
-/schema               # folder for all your schemas
-  query.gql           # all your queries go here
-  mutation.gql        # all your mutations go here
-  other.gql           # place your types in seperate files
-
-/resolver             # resolver package
-  resolver.go         # root resolver
-  other.go            # place other resolvers in seperate files
-
-/model                # model package
-  genereated.go       # all generated models (don't edit this file)
-  customModel.go      # place all models which you want to define by your own in seperate model files
-                      # don't forget to define this in the config: https://gqlgen.com/config/
-
-/server
-  server.go           # your server
-
-/graph
-  /generated
-    generated.go      # generated graphql (don't edit this file)
+input Action {
+  navigate: String     # navigate to url
+  sleep: Int           # sleep n seconds
+  waitVisible: String  # wait till a specific element is visible on page
+  sendKeys: Input      # fill data into an input
+  click: String        # click a specific element on a page
+  evalJS: String       # execute javascript
+}
 ```
 
-1. Now write your types, queries & mutations,
-2. generate the graphql: `go run github.com/99designs/gqlgen`, 
-3. implement the resolvers
-4. and start your server: `go run server/server.go`.
-5. **Have fun! :)**
+### Example login
+
+```
+query {
+  control(
+    actions:[
+      {navigate:"https://your-website-with-login.com/login"},
+      {waitVisible:"input[name='user']"}
+      {sendKeys:{
+        selector: "input[name='user']"
+        value:"your-name"
+      }}
+      {sendKeys:{
+        selector: "input[name='password']"
+        value:"your-pass"
+      }}
+      {click:"input[type='submit']"}
+      {waitVisible:"p.content-you-want-to-query"}
+    ]
+  	outputMap: [
+      {
+        selector: "p.content-you-want-to-query"
+        outKey: "contentList"
+      }
+    ]
+  ) {
+    key
+    value
+    index
+    selector
+  }
+}
+```
 
 ## Docker
 
 Build your graphql as docker container:
 
 ```bash
-docker build -t gql-server .
-docker run -p 8080:8080 gql-server
+docker build -t website-control-graph .
+docker run -p 8080:8080 website-control-graph
 ```
 
 
