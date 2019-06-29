@@ -13,7 +13,8 @@ import (
 )
 
 func CreateContext() (context.Context, context.CancelFunc) {
-	return cdp.NewContext(context.Background(), cdp.WithDebugf(log.Printf))
+	ctx, _ := cdp.NewContext(context.Background(), cdp.WithDebugf(log.Printf))
+	return context.WithTimeout(ctx, 30*time.Second)
 }
 
 func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Output {
@@ -82,7 +83,7 @@ func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Out
 	}
 
 	if err := cdp.Run(ctx, tasks); err != nil {
-		panic(err)
+		log.Println(err)
 	}
 
 	var outmap []*model.Output
