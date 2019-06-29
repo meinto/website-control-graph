@@ -22,14 +22,14 @@ query {
       {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
       {waitVisible:"h1"}
     ]
-  	outputMap: [
+  	output: [
       {
         selector: "h1"
-        outKey: "h1-list"
+        key: "h1-list"
       }
       {
         selector: "h2 .mw-headline"
-        outKey: "h2-list"
+        key: "h2-list"
       }
     ]
   ) {
@@ -72,10 +72,10 @@ query {
       {click:"input[type='submit']"}
       {waitVisible:"p.content-you-want-to-query"}
     ]
-  	outputMap: [
+  	output: [
       {
         selector: "p.content-you-want-to-query"
-        outKey: "contentList"
+        key: "contentList"
       }
     ]
   ) {

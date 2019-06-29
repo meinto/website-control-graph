@@ -16,7 +16,7 @@ var DockerBuild string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error)
+	Run(actions []*model.Action, mappings []*model.OutputSelector) ([]*model.Output, error)
 }
 
 type chrome struct {
@@ -42,7 +42,7 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mappings []*model.OutputSelector) ([]*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
@@ -119,7 +119,7 @@ func (c *chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) 
 		tasks = append(tasks, cdp.Nodes(mapping.Selector, &nodes, cdp.ByQueryAll))
 		keyNodes = append(keyNodes, keyNode{
 			&nodes,
-			mapping.OutKey,
+			mapping.Key,
 		})
 	}
 
@@ -130,11 +130,11 @@ func (c *chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) 
 	var outmap []*model.Output
 	for _, mapping := range mappings {
 		for _, keyNode := range keyNodes {
-			if keyNode.key == mapping.OutKey {
+			if keyNode.key == mapping.Key {
 				for i, node := range *keyNode.nodes {
 					if len(node.Children) > 0 && node.Children[0].NodeType == cdproto.NodeTypeText {
 						outmap = append(outmap, &model.Output{
-							Key:      mapping.OutKey,
+							Key:      mapping.Key,
 							Value:    node.Children[0].NodeValue,
 							Index:    i,
 							Selector: mapping.Selector,

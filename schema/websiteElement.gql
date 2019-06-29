@@ -1,4 +1,0 @@
-input WebsiteElement {
-  selector: String!
-  outKey: String!
-}

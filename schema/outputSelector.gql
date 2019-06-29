@@ -1,0 +1,4 @@
+input OutputSelector {
+  selector: String!
+  key: String!
+}
