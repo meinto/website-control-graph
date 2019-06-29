@@ -22,7 +22,7 @@ query {
       {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
       {waitVisible:"h1"}
     ]
-  	output: [
+    output: [
       {
         selector: "h1"
         key: "h1-list"
@@ -72,7 +72,7 @@ query {
       {click:"input[type='submit']"}
       {waitVisible:"p.content-you-want-to-query"}
     ]
-  	output: [
+    output: [
       {
         selector: "p.content-you-want-to-query"
         key: "contentList"
