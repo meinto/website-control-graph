@@ -8,9 +8,12 @@ RUN GO111MODULE=on go generate ./...
 RUN GO111MODULE=on GOOS=linux GOARCH=386 go build -o gql-server server/server.go
 
 
-FROM golang:1.12-alpine
+FROM chromedp/headless-shell:74.0.3729.1
 
-WORKDIR /app/
 COPY --from=builder /go/src/github.com/meinto/gqlgen-starter/gql-server .
 
-CMD /app/gql-server
+COPY docker.startup.sh .
+
+EXPOSE 8080
+
+ENTRYPOINT [ "/docker.startup.sh" ]

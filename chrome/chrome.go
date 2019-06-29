@@ -13,8 +13,16 @@ import (
 )
 
 func CreateContext() (context.Context, context.CancelFunc) {
-	ctx, _ := cdp.NewContext(context.Background(), cdp.WithDebugf(log.Printf))
-	return context.WithTimeout(ctx, 30*time.Second)
+	opts := []cdp.ExecAllocatorOption{
+		cdp.NoFirstRun,
+		cdp.NoDefaultBrowserCheck,
+		cdp.Headless,
+		cdp.DisableGPU,
+		cdp.ExecPath("/headless-shell/headless-shell"),
+	}
+	ctx, _ := cdp.NewExecAllocator(context.Background(), opts...)
+	ctx, _ = cdp.NewContext(ctx, cdp.WithDebugf(log.Printf))
+	return context.WithTimeout(ctx, 20*time.Second)
 }
 
 func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Output {
