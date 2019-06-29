@@ -14,15 +14,20 @@ import (
 
 var DockerBuild string = "no"
 
-type Chrome struct {
+type Chrome interface {
+	CreateContext() (context.Context, context.CancelFunc)
+	Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error)
+}
+
+type chrome struct {
 	timeout time.Duration
 }
 
-func New(timeout time.Duration) *Chrome {
-	return &Chrome{timeout}
+func New(timeout time.Duration) Chrome {
+	return &chrome{timeout}
 }
 
-func (c *Chrome) CreateContext() (context.Context, context.CancelFunc) {
+func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	opts := []cdp.ExecAllocatorOption{
 		cdp.NoFirstRun,
 		cdp.NoDefaultBrowserCheck,
@@ -37,7 +42,7 @@ func (c *Chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *Chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
