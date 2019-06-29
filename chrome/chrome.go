@@ -12,7 +12,7 @@ import (
 	"github.com/meinto/website-control-graph/model"
 )
 
-var AddExecPathInBuild string = "no"
+var DockerBuild string = "no"
 
 func CreateContext() (context.Context, context.CancelFunc) {
 	opts := []cdp.ExecAllocatorOption{
@@ -21,7 +21,7 @@ func CreateContext() (context.Context, context.CancelFunc) {
 		cdp.Headless,
 		cdp.DisableGPU,
 	}
-	if AddExecPathInBuild == "yes" {
+	if DockerBuild == "yes" {
 		opts = append(opts, cdp.ExecPath("/headless-shell/headless-shell"))
 	}
 	ctx, _ := cdp.NewExecAllocator(context.Background(), opts...)
