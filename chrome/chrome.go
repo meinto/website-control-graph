@@ -14,7 +14,15 @@ import (
 
 var DockerBuild string = "no"
 
-func CreateContext() (context.Context, context.CancelFunc) {
+type Chrome struct {
+	timeout time.Duration
+}
+
+func New(timeout time.Duration) *Chrome {
+	return &Chrome{timeout}
+}
+
+func (c *Chrome) CreateContext() (context.Context, context.CancelFunc) {
 	opts := []cdp.ExecAllocatorOption{
 		cdp.NoFirstRun,
 		cdp.NoDefaultBrowserCheck,
@@ -26,11 +34,11 @@ func CreateContext() (context.Context, context.CancelFunc) {
 	}
 	ctx, _ := cdp.NewExecAllocator(context.Background(), opts...)
 	ctx, _ = cdp.NewContext(ctx, cdp.WithDebugf(log.Printf))
-	return context.WithTimeout(ctx, 20*time.Second)
+	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
-	ctx, cancel := CreateContext()
+func (c *Chrome) Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
+	ctx, cancel := c.CreateContext()
 	defer cancel()
 
 	var tasks cdp.Tasks

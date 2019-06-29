@@ -4,6 +4,7 @@ package resolver
 
 import (
 	"context"
+	"time"
 
 	"github.com/meinto/website-control-graph/chrome"
 	"github.com/meinto/website-control-graph/graph/generated"
@@ -18,6 +19,11 @@ func (r *Resolver) Query() generated.QueryResolver {
 
 type queryResolver struct{ *Resolver }
 
-func (r *queryResolver) Control(ctx context.Context, actions []*model.Action, mapping []*model.WebsiteElement) ([]*model.Output, error) {
-	return chrome.Run(actions, mapping)
+func (r *queryResolver) Control(ctx context.Context, timeout *int, actions []*model.Action, mapping []*model.WebsiteElement) ([]*model.Output, error) {
+	c := chrome.New(20)
+	if timeout != nil {
+		t := time.Duration(*timeout)
+		c = chrome.New(t)
+	}
+	return c.Run(actions, mapping)
 }
