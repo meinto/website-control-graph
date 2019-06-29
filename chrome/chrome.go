@@ -29,7 +29,7 @@ func CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, 20*time.Second)
 }
 
-func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Output {
+func Run(actions []*model.Action, mappings []*model.WebsiteElement) ([]*model.Output, error) {
 	ctx, cancel := CreateContext()
 	defer cancel()
 
@@ -95,7 +95,7 @@ func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Out
 	}
 
 	if err := cdp.Run(ctx, tasks); err != nil {
-		log.Println(err)
+		return nil, err
 	}
 
 	var outmap []*model.Output
@@ -116,5 +116,5 @@ func Run(actions []*model.Action, mappings []*model.WebsiteElement) []*model.Out
 		}
 	}
 
-	return outmap
+	return outmap, nil
 }

@@ -19,6 +19,5 @@ func (r *Resolver) Query() generated.QueryResolver {
 type queryResolver struct{ *Resolver }
 
 func (r *queryResolver) Control(ctx context.Context, actions []*model.Action, mapping []*model.WebsiteElement) ([]*model.Output, error) {
-	o := chrome.Run(actions, mapping)
-	return o, nil
+	return chrome.Run(actions, mapping)
 }
