@@ -9,7 +9,7 @@ import (
 
 	cdproto "github.com/chromedp/cdproto/cdp"
 	cdp "github.com/chromedp/chromedp"
-	"github.com/meinto/gqlgen-starter/model"
+	"github.com/meinto/website-control-graph/model"
 )
 
 var AddExecPathInBuild string = "no"

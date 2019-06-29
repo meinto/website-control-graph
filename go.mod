@@ -1,4 +1,4 @@
-module github.com/meinto/gqlgen-starter
+module github.com/meinto/website-control-graph
 
 go 1.12
 

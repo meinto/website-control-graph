@@ -5,9 +5,9 @@ package resolver
 import (
 	"context"
 
-	"github.com/meinto/gqlgen-starter/chrome"
-	"github.com/meinto/gqlgen-starter/graph/generated"
-	"github.com/meinto/gqlgen-starter/model"
+	"github.com/meinto/website-control-graph/chrome"
+	"github.com/meinto/website-control-graph/graph/generated"
+	"github.com/meinto/website-control-graph/model"
 )
 
 type Resolver struct{}

@@ -13,7 +13,7 @@ go run server/server.go
 
 ## Test it
 
-Open localhost:8080 and copy-paste the query. You will get the `h1` and `h2` headlines of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program) as result.
+Open http://localhost:8080 and copy-paste the query. You will get the `h1` and `h2` headlines of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program) as result.
 
 ```
 query {

@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/99designs/gqlgen/handler"
-	"github.com/meinto/gqlgen-starter/graph/generated"
-	"github.com/meinto/gqlgen-starter/resolver"
+	"github.com/meinto/website-control-graph/graph/generated"
+	"github.com/meinto/website-control-graph/resolver"
 )
 
 const defaultPort = "8080"
