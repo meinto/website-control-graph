@@ -29,7 +29,7 @@ type chrome struct {
 
 type outputValues struct {
 	val *string
-	key string
+	key *string
 }
 
 func New(timeout time.Duration) Chrome {
@@ -186,7 +186,7 @@ func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*mode
 		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
 		ov = append(ov, outputValues{
 			&res,
-			*m.Key,
+			m.Key,
 		})
 	}
 
@@ -196,7 +196,7 @@ func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*mode
 func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues, mapping []*model.Selector) (outmap []*model.OutputElement) {
 	for _, m := range mapping {
 		for _, ov := range outputValues {
-			if m.Key != nil && ov.key == *m.Key {
+			if m.Key != nil && ov.key != nil && *ov.key == *m.Key {
 				vs := strings.Split(*ov.val, ";;")
 				for i, v := range vs {
 					outmap = append(outmap, &model.OutputElement{
