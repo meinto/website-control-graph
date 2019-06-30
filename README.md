@@ -107,7 +107,7 @@ query {
       {navigate:"https://en.wikipedia.org$0"},
       {waitVisible:"h1"}
     ]
-  	output: [
+    output: [
       {
         selector: "h1"
         key: "h1-list"
