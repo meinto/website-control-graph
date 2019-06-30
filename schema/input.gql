@@ -5,7 +5,7 @@ input Action {
   sendKeys: Input
   click: String 
   evalJS: String
-  store: Selector
+  runtimeVar: Selector
 }
 
 # helper types

@@ -3,5 +3,5 @@ type Query {
     timeout: Int
     actions: [Action]
     output: [OutputSelector]
-  ): [Output]
+  ): Output
 }

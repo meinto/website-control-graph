@@ -16,10 +16,10 @@ var DockerBuild string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run(actions []*model.Action, mappings []*model.OutputSelector) ([]*model.Output, error)
-	TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.Tasks
+	Run(actions []*model.Action, mappings []*model.OutputSelector) (*model.Output, error)
+	TasksForActions(tasks cdp.Tasks, actions []*model.Action) (cdp.Tasks, []*model.RuntimeVar)
 	TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes)
-	MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.Output)
+	MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.OutputElement)
 }
 
 type chrome struct {
@@ -50,12 +50,12 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) ([]*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
 	var tasks cdp.Tasks
-	tasks = c.TasksFromActions(tasks, actions)
+	tasks, runtimeVars := c.TasksForActions(tasks, actions)
 	tasks, outputNodes := c.TasksForOutput(tasks, mapping)
 
 	if err := cdp.Run(ctx, tasks); err != nil {
@@ -64,18 +64,21 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (
 
 	outmap := c.MapFoundNodesToOutputStruct(outputNodes, mapping)
 
-	return outmap, nil
+	return &model.Output{
+		runtimeVars,
+		outmap,
+	}, nil
 }
 
-func (c *chrome) TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.Tasks {
+func (c *chrome) TasksForActions(tasks cdp.Tasks, actions []*model.Action) (cdp.Tasks, []*model.RuntimeVar) {
+	runtimeVars := make([]*model.RuntimeVar, 0)
+
 	for _, action := range actions {
 		if action != nil {
 			fields := reflect.TypeOf(action)
 			values := reflect.ValueOf(action)
 
 			num := fields.Elem().NumField()
-
-			tmp := make([]*string, 0)
 
 			for i := 0; i < num; i++ {
 				field := fields.Elem().Field(i)
@@ -111,17 +114,21 @@ func (c *chrome) TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.
 						var res []byte
 						tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
 						break
-					case "Store":
-						selector := *action.Store
+					case "RuntimeVar":
+						selector := *action.RuntimeVar
 						selectorJS := fmt.Sprintf(`document.querySelector("%s")`, selector.Element)
 						if selector.Attribute != nil {
-							selectorJS += fmt.Sprintf(`.getAttribute("%s")`, selector.Attribute)
+							selectorJS += fmt.Sprintf(`.getAttribute("%s")`, *selector.Attribute)
 						} else {
 							selectorJS += ".innerHTML"
 						}
 						var res string
 						tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
-						tmp = append(tmp, &res)
+						runtimeVars = append(runtimeVars, &model.RuntimeVar{
+							selector.Attribute,
+							selector.Element,
+							&res,
+						})
 						break
 					}
 				}
@@ -129,7 +136,7 @@ func (c *chrome) TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.
 		}
 	}
 
-	return tasks
+	return tasks, runtimeVars
 }
 
 func (c *chrome) TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes) {
@@ -146,13 +153,13 @@ func (c *chrome) TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector
 	return tasks, outputNodesList
 }
 
-func (c *chrome) MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.Output) {
+func (c *chrome) MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.OutputElement) {
 	for _, m := range mapping {
 		for _, outputNodes := range outputNodesList {
 			if outputNodes.key == m.Key {
 				for i, node := range *outputNodes.nodes {
 					if len(node.Children) > 0 && node.Children[0].NodeType == cdproto.NodeTypeText {
-						outmap = append(outmap, &model.Output{
+						outmap = append(outmap, &model.OutputElement{
 							Key:      m.Key,
 							Value:    node.Children[0].NodeValue,
 							Index:    i,

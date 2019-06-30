@@ -1,6 +1,17 @@
 type Output {
+  runtimeVars: [RuntimeVar]
+  output: [OutputElement]
+}
+
+type OutputElement {
   key: String!
   selector: String!
   index: Int!
   value: String!
+}
+
+type RuntimeVar {
+  attribute: String
+  element: String!
+  value: String
 }
