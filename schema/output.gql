@@ -11,6 +11,7 @@ type OutputElement {
 }
 
 type RuntimeVar {
+  name: String!
   attribute: String
   element: String!
   value: String

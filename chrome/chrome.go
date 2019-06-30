@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"time"
 
 	cdproto "github.com/chromedp/cdproto/cdp"
@@ -13,13 +14,14 @@ import (
 )
 
 var DockerBuild string = "no"
+var ShouldLog string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run(actions []*model.Action, mappings []*model.OutputSelector) (*model.Output, error)
-	TasksForActions(tasks cdp.Tasks, actions []*model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes)
-	MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.OutputElement)
+	Run([]*model.Action, []*model.OutputSelector) (*model.Output, error)
+	TasksForAction([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
+	TasksForOutput([]*model.OutputSelector) (cdp.Tasks, []outputNodes)
+	MapFoundNodesToOutputStruct([]outputNodes, []*model.OutputSelector) []*model.OutputElement
 }
 
 type chrome struct {
@@ -36,17 +38,22 @@ func New(timeout time.Duration) Chrome {
 }
 
 func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
-	opts := []cdp.ExecAllocatorOption{
+	allocatorOpts := []cdp.ExecAllocatorOption{
 		cdp.NoFirstRun,
 		cdp.NoDefaultBrowserCheck,
 		cdp.Headless,
 		cdp.DisableGPU,
 	}
 	if DockerBuild == "yes" {
-		opts = append(opts, cdp.ExecPath("/headless-shell/headless-shell"))
+		allocatorOpts = append(allocatorOpts, cdp.ExecPath("/headless-shell/headless-shell"))
 	}
-	ctx, _ := cdp.NewExecAllocator(context.Background(), opts...)
-	ctx, _ = cdp.NewContext(ctx, cdp.WithDebugf(log.Printf))
+	ctx, _ := cdp.NewExecAllocator(context.Background(), allocatorOpts...)
+
+	cdpContextOpts := []cdp.ContextOption{}
+	if ShouldLog == "yes" {
+		cdpContextOpts = append(cdpContextOpts, cdp.WithDebugf(log.Printf))
+	}
+	ctx, _ = cdp.NewContext(ctx, cdpContextOpts...)
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
@@ -54,10 +61,17 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
-	var tasks cdp.Tasks
-	tasks, runtimeVars := c.TasksForActions(tasks, actions)
-	tasks, outputNodes := c.TasksForOutput(tasks, mapping)
+	runtimeVars := make([]*model.RuntimeVar, 0)
+	for _, action := range actions {
+		tasks, rv := c.TasksForAction(runtimeVars, action)
+		runtimeVars = rv
 
+		if err := cdp.Run(ctx, tasks); err != nil {
+			return nil, err
+		}
+	}
+
+	tasks, outputNodes := c.TasksForOutput(mapping)
 	if err := cdp.Run(ctx, tasks); err != nil {
 		return nil, err
 	}
@@ -70,67 +84,70 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (
 	}, nil
 }
 
-func (c *chrome) TasksForActions(tasks cdp.Tasks, actions []*model.Action) (cdp.Tasks, []*model.RuntimeVar) {
-	runtimeVars := make([]*model.RuntimeVar, 0)
+func (c *chrome) TasksForAction(runtimeVars []*model.RuntimeVar, action *model.Action) (cdp.Tasks, []*model.RuntimeVar) {
+	var tasks cdp.Tasks
 
-	for _, action := range actions {
-		if action != nil {
-			fields := reflect.TypeOf(action)
-			values := reflect.ValueOf(action)
+	if action != nil {
+		fields := reflect.TypeOf(action)
+		values := reflect.ValueOf(action)
 
-			num := fields.Elem().NumField()
+		num := fields.Elem().NumField()
 
-			for i := 0; i < num; i++ {
-				field := fields.Elem().Field(i)
-				value := values.Elem().Field(i)
+		for i := 0; i < num; i++ {
+			field := fields.Elem().Field(i)
+			value := values.Elem().Field(i)
 
-				if !value.IsNil() {
-					switch field.Name {
-					case "Navigate":
-						// url := *action.Navigate
-						// r := regexp.Compile("(\$[0-9]+)")
-						// url = fmt.Sprintf(url)
-						tasks = append(tasks, cdp.Navigate(value.Elem().String()))
-						break
-					case "Sleep":
-						duration := time.Duration(value.Elem().Int()) * time.Second
-						tasks = append(tasks, cdp.Sleep(duration))
-						break
-					case "WaitVisible":
-						selector := *action.WaitVisible
-						tasks = append(tasks, cdp.WaitVisible(selector, cdp.ByQuery))
-						break
-					case "SendKeys":
-						selector := action.SendKeys.Selector
-						val := action.SendKeys.Value
-						tasks = append(tasks, cdp.SendKeys(selector, val, cdp.ByQuery))
-						break
-					case "Click":
-						selector := *action.Click
-						tasks = append(tasks, cdp.Click(selector, cdp.ByQuery))
-						break
-					case "EvalJs":
-						js := *action.EvalJs
-						var res []byte
-						tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
-						break
-					case "RuntimeVar":
-						selector := *action.RuntimeVar
-						selectorJS := fmt.Sprintf(`document.querySelector("%s")`, selector.Element)
-						if selector.Attribute != nil {
-							selectorJS += fmt.Sprintf(`.getAttribute("%s")`, *selector.Attribute)
-						} else {
-							selectorJS += ".innerHTML"
-						}
-						var res string
-						tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
-						runtimeVars = append(runtimeVars, &model.RuntimeVar{
-							selector.Attribute,
-							selector.Element,
-							&res,
-						})
-						break
+			if !value.IsNil() {
+				switch field.Name {
+				case "Navigate":
+					url := c.ReplaceRuntimeTemplates(runtimeVars, *action.Navigate)
+					tasks = append(tasks, cdp.Navigate(url))
+					break
+				case "Sleep":
+					duration := time.Duration(value.Elem().Int()) * time.Second
+					tasks = append(tasks, cdp.Sleep(duration))
+					break
+				case "WaitVisible":
+					selector := c.ReplaceRuntimeTemplates(runtimeVars, *action.WaitVisible)
+					tasks = append(tasks, cdp.WaitVisible(selector, cdp.ByQuery))
+					break
+				case "SendKeys":
+					selector := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Selector)
+					val := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Value)
+					tasks = append(tasks, cdp.SendKeys(selector, val, cdp.ByQuery))
+					break
+				case "Click":
+					selector := c.ReplaceRuntimeTemplates(runtimeVars, *action.Click)
+					tasks = append(tasks, cdp.Click(selector, cdp.ByQuery))
+					break
+				case "EvalJs":
+					js := c.ReplaceRuntimeTemplates(runtimeVars, *action.EvalJs)
+					var res []byte
+					tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
+					break
+				case "RuntimeVar":
+					selector := *action.RuntimeVar
+					selectorJS := c.ReplaceRuntimeTemplates(
+						runtimeVars,
+						fmt.Sprintf(`document.querySelector("%s")`, selector.Element),
+					)
+					if selector.Attribute != nil {
+						selectorJS += c.ReplaceRuntimeTemplates(
+							runtimeVars,
+							fmt.Sprintf(`.getAttribute("%s")`, *selector.Attribute),
+						)
+					} else {
+						selectorJS += ".innerHTML"
 					}
+					var res string
+					tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
+					runtimeVars = append(runtimeVars, &model.RuntimeVar{
+						fmt.Sprintf("$%d", len(runtimeVars)),
+						selector.Attribute,
+						selector.Element,
+						&res,
+					})
+					break
 				}
 			}
 		}
@@ -139,7 +156,17 @@ func (c *chrome) TasksForActions(tasks cdp.Tasks, actions []*model.Action) (cdp.
 	return tasks, runtimeVars
 }
 
-func (c *chrome) TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes) {
+func (c *chrome) ReplaceRuntimeTemplates(runtimeVars []*model.RuntimeVar, sourceString string) string {
+	s := sourceString
+	for _, v := range runtimeVars {
+		s = strings.ReplaceAll(s, v.Name, *v.Value)
+		log.Println(s, v.Name, *v.Value)
+	}
+	return s
+}
+
+func (c *chrome) TasksForOutput(mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes) {
+	var tasks cdp.Tasks
 	var outputNodesList []outputNodes
 	for _, m := range mapping {
 		var nodes []*cdproto.Node
