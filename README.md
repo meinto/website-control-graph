@@ -24,11 +24,11 @@ query {
     ]
     output: [
       {
-        selector: "h1"
+        element: "h1"
         key: "h1-list"
       }
       {
-        selector: "h2 .mw-headline"
+        element: "h2 .mw-headline"
         key: "h2-list"
       }
     ]
@@ -77,7 +77,7 @@ query {
     ]
     output: [
       {
-        selector: "p.content-you-want-to-query"
+        element: "p.content-you-want-to-query"
         key: "contentList"
       }
     ]
@@ -111,7 +111,7 @@ query {
     ]
     output: [
       {
-        selector: "h1"
+        element: "h1"
         key: "h1-list"
       }
     ]
