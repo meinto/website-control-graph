@@ -94,7 +94,7 @@ query {
 
 ### Example runtime variable
 
-The result of the following query will be the `h1` Headline of [Hello_World_(disambiguation)](https://en.wikipedia.org/wiki/Hello_World_(disambiguation)) page. This is the first link of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program).
+The result of the following query will be the `h1` Headline of the [Hello_World_(disambiguation)](https://en.wikipedia.org/wiki/Hello_World_(disambiguation)) page. This is the first link of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program).
 
 ```
 query {
@@ -102,11 +102,11 @@ query {
     actions:[
       {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
       {waitVisible:"h1"}
-      {runtimeVar: {
+      {runtimeVar: {                              # store the link to Hello_World_(disambiguation) page
         attribute: "href"
         element: ".mw-disambig"
       }}
-      {navigate:"https://en.wikipedia.org$0"},
+      {navigate:"https://en.wikipedia.org$0"},    # use the link to Hello_World_(disambiguation) page ($0)
       {waitVisible:"h1"}
     ]
     output: [
