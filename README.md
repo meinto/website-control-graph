@@ -94,6 +94,8 @@ query {
 
 ### Example runtime variable
 
+The result of the following query will be the `h1` Headline of [Hello_World_(disambiguation)](https://en.wikipedia.org/wiki/Hello_World_(disambiguation)) page. This is the first link of the [hello world wikipedia article](https://en.wikipedia.org/wiki/%22Hello,_World!%22_program).
+
 ```
 query {
   control(
