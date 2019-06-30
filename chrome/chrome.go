@@ -17,10 +17,18 @@ var DockerBuild string = "no"
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
 	Run(actions []*model.Action, mappings []*model.OutputSelector) ([]*model.Output, error)
+	TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.Tasks
+	TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes)
+	MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.Output)
 }
 
 type chrome struct {
 	timeout time.Duration
+}
+
+type outputNodes struct {
+	nodes *[]*cdproto.Node
+	key   string
 }
 
 func New(timeout time.Duration) Chrome {
@@ -42,12 +50,24 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mappings []*model.OutputSelector) ([]*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) ([]*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
 	var tasks cdp.Tasks
+	tasks = c.TasksFromActions(tasks, actions)
+	tasks, outputNodes := c.TasksForOutput(tasks, mapping)
 
+	if err := cdp.Run(ctx, tasks); err != nil {
+		return nil, err
+	}
+
+	outmap := c.MapFoundNodesToOutputStruct(outputNodes, mapping)
+
+	return outmap, nil
+}
+
+func (c *chrome) TasksFromActions(tasks cdp.Tasks, actions []*model.Action) cdp.Tasks {
 	for _, action := range actions {
 		if action != nil {
 			fields := reflect.TypeOf(action)
@@ -109,35 +129,34 @@ func (c *chrome) Run(actions []*model.Action, mappings []*model.OutputSelector) 
 		}
 	}
 
-	type keyNode struct {
-		nodes *[]*cdproto.Node
-		key   string
-	}
-	var keyNodes []keyNode
-	for _, mapping := range mappings {
+	return tasks
+}
+
+func (c *chrome) TasksForOutput(tasks cdp.Tasks, mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes) {
+	var outputNodesList []outputNodes
+	for _, m := range mapping {
 		var nodes []*cdproto.Node
-		tasks = append(tasks, cdp.Nodes(mapping.Selector, &nodes, cdp.ByQueryAll))
-		keyNodes = append(keyNodes, keyNode{
+		tasks = append(tasks, cdp.Nodes(m.Selector, &nodes, cdp.ByQueryAll))
+		outputNodesList = append(outputNodesList, outputNodes{
 			&nodes,
-			mapping.Key,
+			m.Key,
 		})
 	}
 
-	if err := cdp.Run(ctx, tasks); err != nil {
-		return nil, err
-	}
+	return tasks, outputNodesList
+}
 
-	var outmap []*model.Output
-	for _, mapping := range mappings {
-		for _, keyNode := range keyNodes {
-			if keyNode.key == mapping.Key {
-				for i, node := range *keyNode.nodes {
+func (c *chrome) MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.Output) {
+	for _, m := range mapping {
+		for _, outputNodes := range outputNodesList {
+			if outputNodes.key == m.Key {
+				for i, node := range *outputNodes.nodes {
 					if len(node.Children) > 0 && node.Children[0].NodeType == cdproto.NodeTypeText {
 						outmap = append(outmap, &model.Output{
-							Key:      mapping.Key,
+							Key:      m.Key,
 							Value:    node.Children[0].NodeValue,
 							Index:    i,
-							Selector: mapping.Selector,
+							Selector: m.Selector,
 						})
 					}
 				}
@@ -145,5 +164,5 @@ func (c *chrome) Run(actions []*model.Action, mappings []*model.OutputSelector) 
 		}
 	}
 
-	return outmap, nil
+	return outmap
 }
