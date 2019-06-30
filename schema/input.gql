@@ -17,4 +17,5 @@ input Input {
 input Selector {
   attribute: String
   element: String!
+  key: String
 }

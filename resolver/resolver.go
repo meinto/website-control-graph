@@ -19,7 +19,7 @@ func (r *Resolver) Query() generated.QueryResolver {
 
 type queryResolver struct{ *Resolver }
 
-func (r *queryResolver) Control(ctx context.Context, timeout *int, actions []*model.Action, mapping []*model.OutputSelector) (*model.Output, error) {
+func (r *queryResolver) Control(ctx context.Context, timeout *int, actions []*model.Action, mapping []*model.Selector) (*model.Output, error) {
 	c := chrome.New(20)
 	if timeout != nil {
 		t := time.Duration(*timeout)

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	cdproto "github.com/chromedp/cdproto/cdp"
 	cdp "github.com/chromedp/chromedp"
 	"github.com/meinto/website-control-graph/model"
 )
@@ -18,19 +17,19 @@ var ShouldLog string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run([]*model.Action, []*model.OutputSelector) (*model.Output, error)
+	Run([]*model.Action, []*model.Selector) (*model.Output, error)
 	TasksForAction([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	TasksForOutput([]*model.OutputSelector) (cdp.Tasks, []outputNodes)
-	MapFoundNodesToOutputStruct([]outputNodes, []*model.OutputSelector) []*model.OutputElement
+	TasksForOutput([]*model.RuntimeVar, []*model.Selector) (cdp.Tasks, []outputValues)
+	MapFoundNodesToOutputStruct([]outputValues, []*model.Selector) []*model.OutputElement
 }
 
 type chrome struct {
 	timeout time.Duration
 }
 
-type outputNodes struct {
-	nodes *[]*cdproto.Node
-	key   string
+type outputValues struct {
+	val *string
+	key string
 }
 
 func New(timeout time.Duration) Chrome {
@@ -57,7 +56,7 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.Selector) (*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
@@ -71,7 +70,7 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputSelector) (
 		}
 	}
 
-	tasks, outputNodes := c.TasksForOutput(mapping)
+	tasks, outputNodes := c.TasksForOutput(runtimeVars, mapping)
 	if err := cdp.Run(ctx, tasks); err != nil {
 		return nil, err
 	}
@@ -165,34 +164,47 @@ func (c *chrome) ReplaceRuntimeTemplates(runtimeVars []*model.RuntimeVar, source
 	return s
 }
 
-func (c *chrome) TasksForOutput(mapping []*model.OutputSelector) (cdp.Tasks, []outputNodes) {
+func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*model.Selector) (cdp.Tasks, []outputValues) {
 	var tasks cdp.Tasks
-	var outputNodesList []outputNodes
+	var ov []outputValues
 	for _, m := range mapping {
-		var nodes []*cdproto.Node
-		tasks = append(tasks, cdp.Nodes(m.Selector, &nodes, cdp.ByQueryAll))
-		outputNodesList = append(outputNodesList, outputNodes{
-			&nodes,
-			m.Key,
+		selector := m.Element
+		selectorJS := c.ReplaceRuntimeTemplates(
+			runtimeVars,
+			fmt.Sprintf(`Array.prototype.slice.call(document.querySelectorAll("%s"))`, selector),
+		)
+		if m.Attribute != nil {
+			selectorJS += c.ReplaceRuntimeTemplates(
+				runtimeVars,
+				fmt.Sprintf(`.map(node => node.getAttribute("%s"))`, *m.Attribute),
+			)
+		} else {
+			selectorJS += ".map(node => node.innerHTML)"
+		}
+		selectorJS += ".join(';;')"
+		var res string
+		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
+		ov = append(ov, outputValues{
+			&res,
+			*m.Key,
 		})
 	}
 
-	return tasks, outputNodesList
+	return tasks, ov
 }
 
-func (c *chrome) MapFoundNodesToOutputStruct(outputNodesList []outputNodes, mapping []*model.OutputSelector) (outmap []*model.OutputElement) {
+func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues, mapping []*model.Selector) (outmap []*model.OutputElement) {
 	for _, m := range mapping {
-		for _, outputNodes := range outputNodesList {
-			if outputNodes.key == m.Key {
-				for i, node := range *outputNodes.nodes {
-					if len(node.Children) > 0 && node.Children[0].NodeType == cdproto.NodeTypeText {
-						outmap = append(outmap, &model.OutputElement{
-							Key:      m.Key,
-							Value:    node.Children[0].NodeValue,
-							Index:    i,
-							Selector: m.Selector,
-						})
-					}
+		for _, ov := range outputValues {
+			if m.Key != nil && ov.key == *m.Key {
+				vs := strings.Split(*ov.val, ";;")
+				for i, v := range vs {
+					outmap = append(outmap, &model.OutputElement{
+						Key:      *m.Key,
+						Value:    v,
+						Index:    i,
+						Selector: m.Element,
+					})
 				}
 			}
 		}
