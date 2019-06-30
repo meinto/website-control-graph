@@ -33,7 +33,9 @@ query {
       }
     ]
   ) {
-    value
+    output {
+      value
+    }
   }
 }
 ```
@@ -50,6 +52,7 @@ input Action {
   sendKeys: Input      # fill data into an input
   click: String        # click a specific element on a page
   evalJS: String       # execute javascript
+  runtimeVar: Selector # save a string from the website to use it in a following action
 }
 ```
 
@@ -79,10 +82,45 @@ query {
       }
     ]
   ) {
-    key
-    value
-    index
-    selector
+    output {
+      key
+      value
+      index
+      selector
+    }
+  }
+}
+```
+
+### Example runtime variable
+
+```
+query {
+  control(
+    actions:[
+      {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
+      {waitVisible:"h1"}
+      {runtimeVar: {
+        attribute: "href"
+        element: ".mw-disambig"
+      }}
+      {navigate:"https://en.wikipedia.org$0"},
+      {waitVisible:"h1"}
+    ]
+  	output: [
+      {
+        selector: "h1"
+        key: "h1-list"
+      }
+    ]
+  ) {
+    runtimeVars {
+      name
+      value
+    }
+    output {
+      value
+    }
   }
 }
 ```
