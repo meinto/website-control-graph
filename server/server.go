@@ -10,7 +10,7 @@ import (
 	"github.com/meinto/website-control-graph/resolver"
 )
 
-const defaultPort = "8080"
+const defaultPort = "4000"
 
 func main() {
 	port := os.Getenv("PORT")
