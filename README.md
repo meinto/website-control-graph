@@ -86,7 +86,7 @@ query {
       key
       value
       index
-      selector
+      element
     }
   }
 }

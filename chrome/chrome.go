@@ -17,10 +17,10 @@ var ShouldLog string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run([]*model.Action, []*model.Selector) (*model.Output, error)
+	Run([]*model.Action, []*model.OutputMap) (*model.Output, error)
 	TasksForAction([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	TasksForOutput([]*model.RuntimeVar, []*model.Selector) (cdp.Tasks, []outputValues)
-	MapFoundNodesToOutputStruct([]outputValues, []*model.Selector) []*model.OutputElement
+	TasksForOutput([]*model.RuntimeVar, []*model.OutputMap) (cdp.Tasks, []outputValues)
+	MapFoundNodesToOutputStruct([]outputValues) []*model.OutputElement
 }
 
 type chrome struct {
@@ -28,8 +28,11 @@ type chrome struct {
 }
 
 type outputValues struct {
-	val *string
-	key *string
+	val          *string
+	element      string
+	key          string
+	groupElement string
+	groupKey     string
 }
 
 func New(timeout time.Duration) Chrome {
@@ -56,7 +59,7 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mapping []*model.Selector) (*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
@@ -75,7 +78,7 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.Selector) (*model
 		return nil, err
 	}
 
-	outmap := c.MapFoundNodesToOutputStruct(outputNodes, mapping)
+	outmap := c.MapFoundNodesToOutputStruct(outputNodes)
 
 	return &model.Output{
 		runtimeVars,
@@ -164,15 +167,38 @@ func (c *chrome) ReplaceRuntimeTemplates(runtimeVars []*model.RuntimeVar, source
 	return s
 }
 
-func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*model.Selector) (cdp.Tasks, []outputValues) {
+func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*model.OutputMap) (cdp.Tasks, []outputValues) {
 	var tasks cdp.Tasks
 	var ov []outputValues
 	for _, m := range mapping {
-		selector := m.Element
-		selectorJS := c.ReplaceRuntimeTemplates(
-			runtimeVars,
-			fmt.Sprintf(`Array.prototype.slice.call(document.querySelectorAll("%s"))`, selector),
-		)
+		groupElement := ""
+		groupKey := "default"
+
+		selectorJS := ""
+		if m.GroupElement != nil {
+			groupElement = *m.GroupElement
+			selectorJS += c.ReplaceRuntimeTemplates(
+				runtimeVars,
+				fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, groupElement),
+			)
+		}
+		if m.GroupKey != nil {
+			groupKey = *m.GroupKey
+		}
+
+		if m.GroupElement != nil {
+			groupElement = *m.GroupElement
+			selectorJS += c.ReplaceRuntimeTemplates(
+				runtimeVars,
+				fmt.Sprintf(`.map(group => Array.from(group.querySelectorAll("%s"))`, m.Element),
+			)
+		} else {
+			selectorJS += c.ReplaceRuntimeTemplates(
+				runtimeVars,
+				fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, m.Element),
+			)
+		}
+
 		if m.Attribute != nil {
 			selectorJS += c.ReplaceRuntimeTemplates(
 				runtimeVars,
@@ -181,31 +207,42 @@ func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*mode
 		} else {
 			selectorJS += ".map(node => node.innerHTML)"
 		}
+
 		selectorJS += ".join(';;')"
+		if m.GroupElement != nil {
+			selectorJS += ").join('##')"
+		}
+
 		var res string
 		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
+
 		ov = append(ov, outputValues{
-			&res,
-			m.Key,
+			val:          &res,
+			element:      m.Element,
+			key:          m.Key,
+			groupElement: groupElement,
+			groupKey:     groupKey,
 		})
 	}
 
 	return tasks, ov
 }
 
-func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues, mapping []*model.Selector) (outmap []*model.OutputElement) {
-	for _, m := range mapping {
-		for _, ov := range outputValues {
-			if m.Key != nil && ov.key != nil && *ov.key == *m.Key {
-				vs := strings.Split(*ov.val, ";;")
-				for i, v := range vs {
-					outmap = append(outmap, &model.OutputElement{
-						Key:      *m.Key,
-						Value:    v,
-						Index:    i,
-						Selector: m.Element,
-					})
-				}
+func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues) (outmap []*model.OutputElement) {
+	for _, ov := range outputValues {
+		groups := strings.Split(*ov.val, "##")
+		for gi, group := range groups {
+			vs := strings.Split(group, ";;")
+			for i, v := range vs {
+				outmap = append(outmap, &model.OutputElement{
+					Key:          ov.key,
+					Value:        v,
+					Index:        i,
+					Element:      ov.element,
+					GroupElement: ov.groupElement,
+					GroupIndex:   gi,
+					GroupKey:     ov.groupKey,
+				})
 			}
 		}
 	}

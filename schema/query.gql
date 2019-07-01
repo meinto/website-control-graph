@@ -2,6 +2,6 @@ type Query {
   control(
     timeout: Int
     actions: [Action]
-    output: [Selector]
+    output: [OutputMap]
   ): Output
 }
