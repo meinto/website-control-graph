@@ -133,7 +133,7 @@ Build your graphql as docker container:
 
 ```bash
 docker build -t website-control-graph .
-docker run -p 8080:8080 website-control-graph
+docker run -p 4000:4000 website-control-graph
 ```
 
 
