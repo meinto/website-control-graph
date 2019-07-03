@@ -15,6 +15,6 @@ COPY --from=builder /go/src/github.com/meinto/website-control-graph/gql-server .
 
 COPY docker.startup.sh .
 
-EXPOSE 8080
+EXPOSE 4000
 
 ENTRYPOINT [ "/docker.startup.sh" ]
