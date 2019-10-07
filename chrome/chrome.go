@@ -24,7 +24,8 @@ type Chrome interface {
 }
 
 type chrome struct {
-	timeout time.Duration
+	timeout   time.Duration
+	omitEmpty bool
 }
 
 type outputValues struct {
@@ -35,8 +36,12 @@ type outputValues struct {
 	groupKey     string
 }
 
-func New(timeout time.Duration) Chrome {
-	return &chrome{timeout}
+func New(timeout time.Duration, omitEmpty *bool) Chrome {
+	oe := false
+	if omitEmpty != nil {
+		oe = *omitEmpty
+	}
+	return &chrome{timeout, oe}
 }
 
 func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
@@ -234,15 +239,17 @@ func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues) (outma
 		for gi, group := range groups {
 			vs := strings.Split(group, ";;")
 			for i, v := range vs {
-				outmap = append(outmap, &model.OutputElement{
-					Key:          ov.key,
-					Value:        v,
-					Index:        i,
-					Element:      ov.element,
-					GroupElement: ov.groupElement,
-					GroupIndex:   gi,
-					GroupKey:     ov.groupKey,
-				})
+				if c.omitEmpty == false || (c.omitEmpty == true && len(v) > 0) {
+					outmap = append(outmap, &model.OutputElement{
+						Key:          ov.key,
+						Value:        v,
+						Index:        i,
+						Element:      ov.element,
+						GroupElement: ov.groupElement,
+						GroupIndex:   gi,
+						GroupKey:     ov.groupKey,
+					})
+				}
 			}
 		}
 	}
