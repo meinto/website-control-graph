@@ -1,0 +1,7 @@
+type Mutation {
+  control(
+    timeout: Int
+    actions: [Action]
+    output: [OutputMap]
+  ): Output
+}
