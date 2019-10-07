@@ -1,6 +1,7 @@
 type Mutation {
   control(
     timeout: Int
+    omitEmpty: Boolean
     actions: [Action]
     output: [OutputMap]
   ): Output

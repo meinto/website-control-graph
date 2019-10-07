@@ -33,11 +33,11 @@ func (r *queryResolver) Control(ctx context.Context, timeout *int, omitEmpty *bo
 	return c.Run(actions, mapping)
 }
 
-func (r *mutationResolver) Control(ctx context.Context, timeout *int, actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
-	c := chrome.New(20)
+func (r *mutationResolver) Control(ctx context.Context, timeout *int, omitEmpty *bool, actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
+	c := chrome.New(20, omitEmpty)
 	if timeout != nil {
 		t := time.Duration(*timeout)
-		c = chrome.New(t)
+		c = chrome.New(t, omitEmpty)
 	}
 	return c.Run(actions, mapping)
 }
