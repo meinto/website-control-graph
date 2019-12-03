@@ -10,5 +10,5 @@ input Selector {
   subSelectors: [Selector]
   key: String
   flat: Boolean
-  cssSelector: String!
+  cssSelector: String
 }

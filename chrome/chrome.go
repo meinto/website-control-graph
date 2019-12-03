@@ -141,26 +141,30 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 					break
 				case "RuntimeVar":
 					selector := *action.RuntimeVar
-					selectorJS := model.ReplaceRuntimeTemplates(
-						runtimeVars,
-						fmt.Sprintf(`document.querySelector("%s")`, selector.CSSSelector),
-					)
-					if selector.HTMLAttribute != nil {
-						selectorJS += model.ReplaceRuntimeTemplates(
+					if selector.CSSSelector != nil {
+						selectorJS := model.ReplaceRuntimeTemplates(
 							runtimeVars,
-							fmt.Sprintf(`.getAttribute("%s")`, *selector.HTMLAttribute),
+							fmt.Sprintf(`document.querySelector("%s")`, *selector.CSSSelector),
 						)
+						if selector.HTMLAttribute != nil {
+							selectorJS += model.ReplaceRuntimeTemplates(
+								runtimeVars,
+								fmt.Sprintf(`.getAttribute("%s")`, *selector.HTMLAttribute),
+							)
+						} else {
+							selectorJS += ".innerHTML"
+						}
+						var res string
+						tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
+						runtimeVars = append(runtimeVars, &model.RuntimeVar{
+							fmt.Sprintf("$%d", len(runtimeVars)),
+							selector.HTMLAttribute,
+							*selector.CSSSelector,
+							&res,
+						})
 					} else {
-						selectorJS += ".innerHTML"
+						log.Println("missing css selector for runtime var")
 					}
-					var res string
-					tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
-					runtimeVars = append(runtimeVars, &model.RuntimeVar{
-						fmt.Sprintf("$%d", len(runtimeVars)),
-						selector.HTMLAttribute,
-						selector.CSSSelector,
-						&res,
-					})
 					break
 				}
 			}
