@@ -11,21 +11,21 @@ import "fmt"
 func (s *Selector) CSSSelectorToJS(runtimeVars []*RuntimeVar, isSubSelector bool) string {
 	selectorJS := ""
 
-	if !isSubSelector {
-		selectorJS += ReplaceRuntimeTemplates(
-			runtimeVars,
-			fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, s.CSSSelector),
-		)
-	} else {
-		selectorJS += ReplaceRuntimeTemplates(
-			runtimeVars,
-			fmt.Sprintf(`.map(group => Array.from(group.querySelectorAll("%s"))`, s.SubSelector),
-		)
-	}
+	// if !isSubSelector {
+	selectorJS += ReplaceRuntimeTemplates(
+		runtimeVars,
+		fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, s.CSSSelector),
+	)
+	// } else {
+	// 	selectorJS += ReplaceRuntimeTemplates(
+	// 		runtimeVars,
+	// 		fmt.Sprintf(`.map(group => Array.from(group.querySelectorAll("%s"))`, s.SubSelector),
+	// 	)
+	// }
 
-	if s.SubSelector != nil {
-		selectorJS += s.SubSelector.CSSSelectorToJS(runtimeVars, true)
-	}
+	// if s.SubSelector != nil {
+	// 	selectorJS += s.SubSelector.CSSSelectorToJS(runtimeVars, true)
+	// }
 
 	return selectorJS
 }

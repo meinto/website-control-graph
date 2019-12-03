@@ -19,8 +19,7 @@ type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
 	Run([]*model.Action, []*model.OutputCollectionMap) (*model.Output, error)
 	ActionToCDPTasks([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	CollectDataCDPTasks([]*model.RuntimeVar, []*model.OutputCollectionMap) (cdp.Tasks, []outputValues)
-	MapFoundNodesToOutputStruct([]outputValues) []*model.OutputCollection
+	CollectDataCDPTasks([]*model.RuntimeVar, []*model.ResultOutputCollectionMap) cdp.Tasks
 }
 
 type chrome struct {
@@ -78,12 +77,20 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 		}
 	}
 
-	tasks, outputNodes := c.CollectDataCDPTasks(runtimeVars, mapping)
+	var resultMapping = []*model.ResultOutputCollectionMap{}
+	for _, m := range mapping {
+		resultMapping = append(resultMapping, &model.ResultOutputCollectionMap{
+			OutputCollectionMap: *m,
+			Result:              nil,
+		})
+	}
+
+	tasks := c.CollectDataCDPTasks(runtimeVars, resultMapping)
 	if err := cdp.Run(ctx, tasks); err != nil {
 		return nil, err
 	}
 
-	outmap := c.MapFoundNodesToOutputStruct(outputNodes)
+	outmap := c.generateOutput(resultMapping)
 
 	return &model.Output{
 		runtimeVars,
@@ -163,13 +170,9 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 	return tasks, runtimeVars
 }
 
-func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.OutputCollectionMap) (cdp.Tasks, []outputValues) {
+func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.ResultOutputCollectionMap) cdp.Tasks {
 	var tasks cdp.Tasks
-	var ov []outputValues
 	for _, m := range mapping {
-
-		groupElement := ""
-		groupKey := "default"
 
 		selectorJS := m.Selector.CSSSelectorToJS(runtimeVars, false)
 
@@ -182,41 +185,54 @@ func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []
 		selectorJS += ".join(';;')"
 		log.Println(selectorJS)
 
-		var res string
-		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
-
-		ov = append(ov, outputValues{
-			val:          &res,
-			element:      "",
-			key:          m.Name,
-			groupElement: groupElement,
-			groupKey:     groupKey,
-		})
+		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &m.Result))
 	}
 
-	return tasks, ov
+	return tasks
 }
 
-func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues) (outmap []*model.OutputCollection) {
-	for _, ov := range outputValues {
-		groups := strings.Split(*ov.val, "##")
-		for gi, group := range groups {
-			vs := strings.Split(group, ";;")
-			for i, v := range vs {
-				if c.omitEmpty == false || (c.omitEmpty == true && len(v) > 0) {
-					outmap = append(outmap, &model.OutputCollection{
-						Key:          ov.key,
-						Value:        v,
-						Index:        i,
-						Element:      ov.element,
-						GroupElement: ov.groupElement,
-						GroupIndex:   gi,
-						GroupKey:     ov.groupKey,
-					})
+func (c *chrome) generateOutput(resultMapping []*model.ResultOutputCollectionMap) (output map[string]interface{}) {
+	output = make(map[string]interface{})
+	for _, m := range resultMapping {
+		collection := m.Name
+		if m.Key != nil {
+			collection = *m.Key
+		}
+
+		var stringValues []string
+		if m.Result != nil {
+			stringValues = strings.Split(*m.Result, ";;")
+		}
+
+		var values interface{}
+		if m.Selector.Flat == nil || *m.Selector.Flat == false {
+			values = make([]map[string]string, 0)
+			for _, s := range stringValues {
+				value := make(map[string]string)
+				selectorKey := "value"
+				if m.Selector.Key != nil {
+					selectorKey = *m.Selector.Key
 				}
+				value[selectorKey] = s
+				values = append(values.([]map[string]string), value)
+			}
+		} else {
+			values = make([]string, 0)
+			for _, s := range stringValues {
+				values = append(values.([]string), s)
 			}
 		}
-	}
 
-	return outmap
+		data := make(map[string]interface{})
+
+		selectorKey := "data"
+		if m.SelectorKey != nil {
+			selectorKey = *m.SelectorKey
+		}
+		data[selectorKey] = values
+		data["collection"] = m.Name
+
+		output[collection] = data
+	}
+	return output
 }

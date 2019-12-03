@@ -1,23 +1,19 @@
+scalar Map
+
 type Output {
   runtimeVars: [RuntimeVar]
-  output: [OutputCollection]
+  output: Map!
 }
 
 input OutputCollectionMap {
+  # Name of collection
   name: String!
+  # Name of key in result JSON
+  # If not set the collection name will be choosen for this
+  key: String
+  # key of the collected data group
+  selectorKey: String
   selector: Selector!
-}
-
-type OutputCollection {
-  name: String!
-
-  key: String!
-  element: String!
-  index: Int!
-  value: String!
-  groupElement: String!
-  groupIndex: Int!
-  groupKey: String!
 }
 
 type RuntimeVar {
