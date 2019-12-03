@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strings"
 	"time"
 
 	cdp "github.com/chromedp/chromedp"
@@ -77,11 +76,11 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 		}
 	}
 
-	var resultMapping = []*model.ResultOutputCollectionMap{}
+	var resultMapping []*model.ResultOutputCollectionMap
 	for _, m := range mapping {
 		resultMapping = append(resultMapping, &model.ResultOutputCollectionMap{
 			OutputCollectionMap: *m,
-			Result:              nil,
+			ResultSelector:      model.NewResultSelector(m.Selector, ""),
 		})
 	}
 
@@ -178,18 +177,20 @@ func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []
 	var tasks cdp.Tasks
 	for _, m := range mapping {
 
-		selectorJS := m.Selector.CSSSelectorToJS(runtimeVars, false)
+		m.ResultSelector.Iterate(func(s *model.ResultSelector) {
+			selectorJS := s.CSSSelectorToJS(runtimeVars)
 
-		if m.Selector.HTMLAttribute != nil {
-			selectorJS = m.Selector.AddHTMLAttributeSelector(selectorJS, runtimeVars)
-		} else {
-			selectorJS = m.Selector.AddInnerHTMLSelector(selectorJS, runtimeVars)
-		}
+			if m.Selector.HTMLAttribute != nil {
+				selectorJS = s.AddHTMLAttributeSelector(selectorJS, runtimeVars)
+			} else {
+				selectorJS = s.AddInnerHTMLSelector(selectorJS, runtimeVars)
+			}
 
-		selectorJS += ".join(';;')"
-		log.Println(selectorJS)
+			selectorJS += ".join(';;')"
+			log.Println(selectorJS)
 
-		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &m.Result))
+			tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &s.Result))
+		})
 	}
 
 	return tasks
@@ -203,29 +204,7 @@ func (c *chrome) generateOutput(resultMapping []*model.ResultOutputCollectionMap
 			collection = *m.Key
 		}
 
-		var stringValues []string
-		if m.Result != nil {
-			stringValues = strings.Split(*m.Result, ";;")
-		}
-
-		var values interface{}
-		if m.Selector.Flat == nil || *m.Selector.Flat == false {
-			values = make([]map[string]string, 0)
-			for _, s := range stringValues {
-				value := make(map[string]string)
-				selectorKey := "value"
-				if m.Selector.Key != nil {
-					selectorKey = *m.Selector.Key
-				}
-				value[selectorKey] = s
-				values = append(values.([]map[string]string), value)
-			}
-		} else {
-			values = make([]string, 0)
-			for _, s := range stringValues {
-				values = append(values.([]string), s)
-			}
-		}
+		values := m.ResultSelector.GetResultJSONArray()
 
 		data := make(map[string]interface{})
 
