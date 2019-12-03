@@ -18,11 +18,3 @@ input Selector {
   attribute: String
   element: String!
 }
-
-input OutputMap {
-  attribute: String
-  element: String!
-  key: String!
-  groupElement: String
-  groupKey: String
-}

@@ -24,7 +24,12 @@ func (r *Resolver) Mutation() generated.MutationResolver {
 type queryResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 
-func (r *queryResolver) Control(ctx context.Context, timeout *int, omitEmpty *bool, actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
+func (r *queryResolver) Control(
+	ctx context.Context,
+	timeout *int,
+	omitEmpty *bool,
+	actions []*model.Action,
+	mapping []*model.OutputCollections) (*model.Output, error) {
 	c := chrome.New(20, omitEmpty)
 	if timeout != nil {
 		t := time.Duration(*timeout)
@@ -33,7 +38,12 @@ func (r *queryResolver) Control(ctx context.Context, timeout *int, omitEmpty *bo
 	return c.Run(actions, mapping)
 }
 
-func (r *mutationResolver) Control(ctx context.Context, timeout *int, omitEmpty *bool, actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
+func (r *mutationResolver) Control(
+	ctx context.Context,
+	timeout *int,
+	omitEmpty *bool,
+	actions []*model.Action,
+	mapping []*model.OutputCollections) (*model.Output, error) {
 	c := chrome.New(20, omitEmpty)
 	if timeout != nil {
 		t := time.Duration(*timeout)

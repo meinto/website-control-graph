@@ -17,10 +17,10 @@ var ShouldLog string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run([]*model.Action, []*model.OutputMap) (*model.Output, error)
-	TasksForAction([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	TasksForOutput([]*model.RuntimeVar, []*model.OutputMap) (cdp.Tasks, []outputValues)
-	MapFoundNodesToOutputStruct([]outputValues) []*model.OutputElement
+	Run([]*model.Action, []*model.OutputCollections) (*model.Output, error)
+	ActionToCDPTasks([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
+	CollectDataCDPTasks([]*model.RuntimeVar, []*model.OutputCollections) (cdp.Tasks, []outputValues)
+	MapFoundNodesToOutputStruct([]outputValues) []*model.OutputCollection
 }
 
 type chrome struct {
@@ -64,13 +64,13 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputMap) (*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollections) (*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
 	runtimeVars := make([]*model.RuntimeVar, 0)
 	for _, action := range actions {
-		tasks, rv := c.TasksForAction(runtimeVars, action)
+		tasks, rv := c.ActionToCDPTasks(runtimeVars, action)
 		runtimeVars = rv
 
 		if err := cdp.Run(ctx, tasks); err != nil {
@@ -78,7 +78,7 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputMap) (*mode
 		}
 	}
 
-	tasks, outputNodes := c.TasksForOutput(runtimeVars, mapping)
+	tasks, outputNodes := c.CollectDataCDPTasks(runtimeVars, mapping)
 	if err := cdp.Run(ctx, tasks); err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputMap) (*mode
 	}, nil
 }
 
-func (c *chrome) TasksForAction(runtimeVars []*model.RuntimeVar, action *model.Action) (cdp.Tasks, []*model.RuntimeVar) {
+func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model.Action) (cdp.Tasks, []*model.RuntimeVar) {
 	var tasks cdp.Tasks
 
 	if action != nil {
@@ -172,7 +172,7 @@ func (c *chrome) ReplaceRuntimeTemplates(runtimeVars []*model.RuntimeVar, source
 	return s
 }
 
-func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*model.OutputMap) (cdp.Tasks, []outputValues) {
+func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.OutputCollections) (cdp.Tasks, []outputValues) {
 	var tasks cdp.Tasks
 	var ov []outputValues
 	for _, m := range mapping {
@@ -233,14 +233,14 @@ func (c *chrome) TasksForOutput(runtimeVars []*model.RuntimeVar, mapping []*mode
 	return tasks, ov
 }
 
-func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues) (outmap []*model.OutputElement) {
+func (c *chrome) MapFoundNodesToOutputStruct(outputValues []outputValues) (outmap []*model.OutputCollection) {
 	for _, ov := range outputValues {
 		groups := strings.Split(*ov.val, "##")
 		for gi, group := range groups {
 			vs := strings.Split(group, ";;")
 			for i, v := range vs {
 				if c.omitEmpty == false || (c.omitEmpty == true && len(v) > 0) {
-					outmap = append(outmap, &model.OutputElement{
+					outmap = append(outmap, &model.OutputCollection{
 						Key:          ov.key,
 						Value:        v,
 						Index:        i,

@@ -1,9 +1,21 @@
 type Output {
   runtimeVars: [RuntimeVar]
-  output: [OutputElement]
+  output: [OutputCollection]
 }
 
-type OutputElement {
+input OutputCollections {
+  name: String!
+
+  attribute: String
+  element: String!
+  key: String!
+  groupElement: String
+  groupKey: String
+}
+
+type OutputCollection {
+  name: String!
+
   key: String!
   element: String!
   index: Int!
