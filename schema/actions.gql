@@ -1,20 +1,16 @@
 input Action {
+  # Url
   navigate: String
+  # Number in Seconds
   sleep: Int
+  # CSS Selector
   waitVisible: String
+  # Fill a form element
   sendKeys: Input
-  click: String 
+  # CSS Selector
+  click: String
+  # JS Code
   evalJS: String
+  # Collect a Runtime variable
   runtimeVar: Selector
-}
-
-# helper types
-input Input {
-  selector: String!
-  value: String!
-}
-
-input Selector {
-  attribute: String
-  element: String!
 }

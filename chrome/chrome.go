@@ -119,7 +119,7 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 					tasks = append(tasks, cdp.WaitVisible(selector, cdp.ByQuery))
 					break
 				case "SendKeys":
-					selector := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Selector)
+					selector := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.CSSSelector)
 					val := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Value)
 					tasks = append(tasks, cdp.SendKeys(selector, val, cdp.ByQuery))
 					break
@@ -136,12 +136,12 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 					selector := *action.RuntimeVar
 					selectorJS := c.ReplaceRuntimeTemplates(
 						runtimeVars,
-						fmt.Sprintf(`document.querySelector("%s")`, selector.Element),
+						fmt.Sprintf(`document.querySelector("%s")`, selector.CSSSelector),
 					)
-					if selector.Attribute != nil {
+					if selector.HTMLAttribute != nil {
 						selectorJS += c.ReplaceRuntimeTemplates(
 							runtimeVars,
-							fmt.Sprintf(`.getAttribute("%s")`, *selector.Attribute),
+							fmt.Sprintf(`.getAttribute("%s")`, *selector.HTMLAttribute),
 						)
 					} else {
 						selectorJS += ".innerHTML"
@@ -150,8 +150,8 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 					tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
 					runtimeVars = append(runtimeVars, &model.RuntimeVar{
 						fmt.Sprintf("$%d", len(runtimeVars)),
-						selector.Attribute,
-						selector.Element,
+						selector.HTMLAttribute,
+						selector.CSSSelector,
 						&res,
 					})
 					break

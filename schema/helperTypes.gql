@@ -1,0 +1,11 @@
+input Input {
+  cssSelector: String!
+  value: String!
+}
+
+input Selector {
+  HTMLAttribute: String
+  innerHTML: Boolean
+  regex: String
+  cssSelector: String!
+}
