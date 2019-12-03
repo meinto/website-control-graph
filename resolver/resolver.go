@@ -29,7 +29,7 @@ func (r *queryResolver) Control(
 	timeout *int,
 	omitEmpty *bool,
 	actions []*model.Action,
-	mapping []*model.OutputCollections) (*model.Output, error) {
+	mapping []*model.OutputCollectionMap) (*model.Output, error) {
 	c := chrome.New(20, omitEmpty)
 	if timeout != nil {
 		t := time.Duration(*timeout)
@@ -43,7 +43,7 @@ func (r *mutationResolver) Control(
 	timeout *int,
 	omitEmpty *bool,
 	actions []*model.Action,
-	mapping []*model.OutputCollections) (*model.Output, error) {
+	mapping []*model.OutputCollectionMap) (*model.Output, error) {
 	c := chrome.New(20, omitEmpty)
 	if timeout != nil {
 		t := time.Duration(*timeout)

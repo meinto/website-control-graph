@@ -17,9 +17,9 @@ var ShouldLog string = "no"
 
 type Chrome interface {
 	CreateContext() (context.Context, context.CancelFunc)
-	Run([]*model.Action, []*model.OutputCollections) (*model.Output, error)
+	Run([]*model.Action, []*model.OutputCollectionMap) (*model.Output, error)
 	ActionToCDPTasks([]*model.RuntimeVar, *model.Action) (cdp.Tasks, []*model.RuntimeVar)
-	CollectDataCDPTasks([]*model.RuntimeVar, []*model.OutputCollections) (cdp.Tasks, []outputValues)
+	CollectDataCDPTasks([]*model.RuntimeVar, []*model.OutputCollectionMap) (cdp.Tasks, []outputValues)
 	MapFoundNodesToOutputStruct([]outputValues) []*model.OutputCollection
 }
 
@@ -64,7 +64,7 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.timeout*time.Second)
 }
 
-func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollections) (*model.Output, error) {
+func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionMap) (*model.Output, error) {
 	ctx, cancel := c.CreateContext()
 	defer cancel()
 
@@ -107,7 +107,7 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 			if !value.IsNil() {
 				switch field.Name {
 				case "Navigate":
-					url := c.ReplaceRuntimeTemplates(runtimeVars, *action.Navigate)
+					url := model.ReplaceRuntimeTemplates(runtimeVars, *action.Navigate)
 					tasks = append(tasks, cdp.Navigate(url))
 					break
 				case "Sleep":
@@ -115,31 +115,31 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 					tasks = append(tasks, cdp.Sleep(duration))
 					break
 				case "WaitVisible":
-					selector := c.ReplaceRuntimeTemplates(runtimeVars, *action.WaitVisible)
+					selector := model.ReplaceRuntimeTemplates(runtimeVars, *action.WaitVisible)
 					tasks = append(tasks, cdp.WaitVisible(selector, cdp.ByQuery))
 					break
 				case "SendKeys":
-					selector := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.CSSSelector)
-					val := c.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Value)
+					selector := model.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.CSSSelector)
+					val := model.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Value)
 					tasks = append(tasks, cdp.SendKeys(selector, val, cdp.ByQuery))
 					break
 				case "Click":
-					selector := c.ReplaceRuntimeTemplates(runtimeVars, *action.Click)
+					selector := model.ReplaceRuntimeTemplates(runtimeVars, *action.Click)
 					tasks = append(tasks, cdp.Click(selector, cdp.ByQuery))
 					break
 				case "EvalJs":
-					js := c.ReplaceRuntimeTemplates(runtimeVars, *action.EvalJs)
+					js := model.ReplaceRuntimeTemplates(runtimeVars, *action.EvalJs)
 					var res []byte
 					tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
 					break
 				case "RuntimeVar":
 					selector := *action.RuntimeVar
-					selectorJS := c.ReplaceRuntimeTemplates(
+					selectorJS := model.ReplaceRuntimeTemplates(
 						runtimeVars,
 						fmt.Sprintf(`document.querySelector("%s")`, selector.CSSSelector),
 					)
 					if selector.HTMLAttribute != nil {
-						selectorJS += c.ReplaceRuntimeTemplates(
+						selectorJS += model.ReplaceRuntimeTemplates(
 							runtimeVars,
 							fmt.Sprintf(`.getAttribute("%s")`, *selector.HTMLAttribute),
 						)
@@ -163,68 +163,32 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 	return tasks, runtimeVars
 }
 
-func (c *chrome) ReplaceRuntimeTemplates(runtimeVars []*model.RuntimeVar, sourceString string) string {
-	s := sourceString
-	for _, v := range runtimeVars {
-		s = strings.ReplaceAll(s, v.Name, *v.Value)
-		log.Println(s, v.Name, *v.Value)
-	}
-	return s
-}
-
-func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.OutputCollections) (cdp.Tasks, []outputValues) {
+func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.OutputCollectionMap) (cdp.Tasks, []outputValues) {
 	var tasks cdp.Tasks
 	var ov []outputValues
 	for _, m := range mapping {
+
 		groupElement := ""
 		groupKey := "default"
 
-		selectorJS := ""
-		if m.GroupElement != nil {
-			groupElement = *m.GroupElement
-			selectorJS += c.ReplaceRuntimeTemplates(
-				runtimeVars,
-				fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, groupElement),
-			)
-		}
-		if m.GroupKey != nil {
-			groupKey = *m.GroupKey
-		}
+		selectorJS := m.Selector.CSSSelectorToJS(runtimeVars, false)
 
-		if m.GroupElement != nil {
-			groupElement = *m.GroupElement
-			selectorJS += c.ReplaceRuntimeTemplates(
-				runtimeVars,
-				fmt.Sprintf(`.map(group => Array.from(group.querySelectorAll("%s"))`, m.Element),
-			)
+		if m.Selector.HTMLAttribute != nil {
+			selectorJS = m.Selector.AddHTMLAttributeSelector(selectorJS, runtimeVars)
 		} else {
-			selectorJS += c.ReplaceRuntimeTemplates(
-				runtimeVars,
-				fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, m.Element),
-			)
-		}
-
-		if m.Attribute != nil {
-			selectorJS += c.ReplaceRuntimeTemplates(
-				runtimeVars,
-				fmt.Sprintf(`.map(node => node.getAttribute("%s"))`, *m.Attribute),
-			)
-		} else {
-			selectorJS += ".map(node => node.innerHTML)"
+			selectorJS = m.Selector.AddInnerHTMLSelector(selectorJS, runtimeVars)
 		}
 
 		selectorJS += ".join(';;')"
-		if m.GroupElement != nil {
-			selectorJS += ").join('##')"
-		}
+		log.Println(selectorJS)
 
 		var res string
 		tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
 
 		ov = append(ov, outputValues{
 			val:          &res,
-			element:      m.Element,
-			key:          m.Key,
+			element:      "",
+			key:          m.Name,
 			groupElement: groupElement,
 			groupKey:     groupKey,
 		})

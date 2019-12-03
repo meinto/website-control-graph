@@ -3,6 +3,6 @@ type Mutation {
     timeout: Int
     omitEmpty: Boolean
     actions: [Action]
-    output: [OutputCollections]
+    output: [OutputCollectionMap]
   ): Output
 }

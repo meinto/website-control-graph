@@ -7,5 +7,6 @@ input Selector {
   HTMLAttribute: String
   innerHTML: Boolean
   regex: String
+  subSelector: Selector
   cssSelector: String!
 }

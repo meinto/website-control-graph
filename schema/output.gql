@@ -3,14 +3,9 @@ type Output {
   output: [OutputCollection]
 }
 
-input OutputCollections {
+input OutputCollectionMap {
   name: String!
-
-  attribute: String
-  element: String!
-  key: String!
-  groupElement: String
-  groupKey: String
+  selector: Selector!
 }
 
 type OutputCollection {
