@@ -7,9 +7,13 @@ input Selector {
   HTMLAttribute: String
   innerHTML: Boolean
   regex: String
-  subSelectorsKey: String
-  subSelectors: [Selector]
-  key: String
-  flat: Boolean
+  subSelectors: [Selector!]
   cssSelector: String
+  key: String!
+  type: SelectorType!
+}
+
+enum SelectorType {
+  prop
+  object
 }

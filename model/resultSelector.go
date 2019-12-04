@@ -24,7 +24,7 @@ func NewResultSelector(s Selector, parentCSSSelector string) ResultSelector {
 	if s.SubSelectors != nil {
 		var subSelectors []ResultSelector
 		for _, ss := range s.SubSelectors {
-			subSelectors = append(subSelectors, NewResultSelector(*ss, cssSelector))
+			subSelectors = append(subSelectors, NewResultSelector(ss, cssSelector))
 		}
 		return ResultSelector{
 			s,
@@ -77,10 +77,7 @@ func (s *ResultSelector) GetResultJSONArray() (values []map[string]string) {
 	values = make([]map[string]string, 0)
 	for _, stringValue := range stringValues {
 		value := make(map[string]string)
-		if s.Selector.Key != nil {
-			selectorKey := *s.Selector.Key
-			value[selectorKey] = stringValue
-		}
+		value["value"] = stringValue
 		values = append(values, value)
 	}
 

@@ -11,9 +11,7 @@ input OutputCollectionMap {
   # Name of key in result JSON
   # If not set the collection name will be choosen for this
   key: String
-  # key of the collected data group
-  selectorKey: String
-  selector: Selector!
+  selectors: [Selector!]!
 }
 
 type RuntimeVar {

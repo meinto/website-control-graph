@@ -78,9 +78,14 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 
 	var resultMapping []*model.ResultOutputCollectionMap
 	for _, m := range mapping {
+		var resultSelectors []*model.ResultSelector
+		for _, s := range m.Selectors {
+			rs := model.NewResultSelector(s, "")
+			resultSelectors = append(resultSelectors, &rs)
+		}
 		resultMapping = append(resultMapping, &model.ResultOutputCollectionMap{
 			OutputCollectionMap: *m,
-			ResultSelector:      model.NewResultSelector(m.Selector, ""),
+			ResultSelectors:     resultSelectors,
 		})
 	}
 
@@ -176,21 +181,22 @@ func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model
 func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.ResultOutputCollectionMap) cdp.Tasks {
 	var tasks cdp.Tasks
 	for _, m := range mapping {
+		for _, rs := range m.ResultSelectors {
+			rs.Iterate(func(s *model.ResultSelector) {
+				selectorJS := s.CSSSelectorToJS(runtimeVars)
 
-		m.ResultSelector.Iterate(func(s *model.ResultSelector) {
-			selectorJS := s.CSSSelectorToJS(runtimeVars)
+				if rs.Selector.HTMLAttribute != nil {
+					selectorJS = s.AddHTMLAttributeSelector(selectorJS, runtimeVars)
+				} else {
+					selectorJS = s.AddInnerHTMLSelector(selectorJS, runtimeVars)
+				}
 
-			if m.Selector.HTMLAttribute != nil {
-				selectorJS = s.AddHTMLAttributeSelector(selectorJS, runtimeVars)
-			} else {
-				selectorJS = s.AddInnerHTMLSelector(selectorJS, runtimeVars)
-			}
+				selectorJS += ".join(';;')"
+				log.Println(selectorJS)
 
-			selectorJS += ".join(';;')"
-			log.Println(selectorJS)
-
-			tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &s.Result))
-		})
+				tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &s.Result))
+			})
+		}
 	}
 
 	return tasks
@@ -204,15 +210,13 @@ func (c *chrome) generateOutput(resultMapping []*model.ResultOutputCollectionMap
 			collection = *m.Key
 		}
 
-		values := m.ResultSelector.GetResultJSONArray()
-
 		data := make(map[string]interface{})
 
-		selectorKey := "data"
-		if m.SelectorKey != nil {
-			selectorKey = *m.SelectorKey
+		for _, rs := range m.ResultSelectors {
+			values := rs.GetResultJSONArray()
+			data[rs.Selector.Key] = values
 		}
-		data[selectorKey] = values
+
 		data["collection"] = m.Name
 
 		output[collection] = data
