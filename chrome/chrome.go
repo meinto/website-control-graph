@@ -2,9 +2,7 @@ package chrome
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"reflect"
 	"time"
 
 	cdp "github.com/chromedp/chromedp"
@@ -80,8 +78,8 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 	for _, m := range mapping {
 		var resultSelectors []*model.ResultSelector
 		for _, s := range m.Selectors {
-			rs := model.NewResultSelector(s, "")
-			resultSelectors = append(resultSelectors, &rs)
+			rs := model.NewResultSelector(s)
+			resultSelectors = append(resultSelectors, rs)
 		}
 		resultMapping = append(resultMapping, &model.ResultOutputCollectionMap{
 			OutputCollectionMap: *m,
@@ -100,126 +98,4 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 		runtimeVars,
 		outmap,
 	}, nil
-}
-
-func (c *chrome) ActionToCDPTasks(runtimeVars []*model.RuntimeVar, action *model.Action) (cdp.Tasks, []*model.RuntimeVar) {
-	var tasks cdp.Tasks
-
-	if action != nil {
-		fields := reflect.TypeOf(action)
-		values := reflect.ValueOf(action)
-
-		num := fields.Elem().NumField()
-
-		for i := 0; i < num; i++ {
-			field := fields.Elem().Field(i)
-			value := values.Elem().Field(i)
-
-			if !value.IsNil() {
-				switch field.Name {
-				case "Navigate":
-					url := model.ReplaceRuntimeTemplates(runtimeVars, *action.Navigate)
-					tasks = append(tasks, cdp.Navigate(url))
-					break
-				case "Sleep":
-					duration := time.Duration(value.Elem().Int()) * time.Second
-					tasks = append(tasks, cdp.Sleep(duration))
-					break
-				case "WaitVisible":
-					selector := model.ReplaceRuntimeTemplates(runtimeVars, *action.WaitVisible)
-					tasks = append(tasks, cdp.WaitVisible(selector, cdp.ByQuery))
-					break
-				case "SendKeys":
-					selector := model.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.CSSSelector)
-					val := model.ReplaceRuntimeTemplates(runtimeVars, action.SendKeys.Value)
-					tasks = append(tasks, cdp.SendKeys(selector, val, cdp.ByQuery))
-					break
-				case "Click":
-					selector := model.ReplaceRuntimeTemplates(runtimeVars, *action.Click)
-					tasks = append(tasks, cdp.Click(selector, cdp.ByQuery))
-					break
-				case "EvalJs":
-					js := model.ReplaceRuntimeTemplates(runtimeVars, *action.EvalJs)
-					var res []byte
-					tasks = append(tasks, cdp.EvaluateAsDevTools(js, &res))
-					break
-				case "RuntimeVar":
-					selector := *action.RuntimeVar
-					if selector.CSSSelector != nil {
-						selectorJS := model.ReplaceRuntimeTemplates(
-							runtimeVars,
-							fmt.Sprintf(`document.querySelector("%s")`, *selector.CSSSelector),
-						)
-						if selector.HTMLAttribute != nil {
-							selectorJS += model.ReplaceRuntimeTemplates(
-								runtimeVars,
-								fmt.Sprintf(`.getAttribute("%s")`, *selector.HTMLAttribute),
-							)
-						} else {
-							selectorJS += ".innerHTML"
-						}
-						var res string
-						tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &res))
-						runtimeVars = append(runtimeVars, &model.RuntimeVar{
-							fmt.Sprintf("$%d", len(runtimeVars)),
-							selector.HTMLAttribute,
-							*selector.CSSSelector,
-							&res,
-						})
-					} else {
-						log.Println("missing css selector for runtime var")
-					}
-					break
-				}
-			}
-		}
-	}
-
-	return tasks, runtimeVars
-}
-
-func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []*model.ResultOutputCollectionMap) cdp.Tasks {
-	var tasks cdp.Tasks
-	for _, m := range mapping {
-		for _, rs := range m.ResultSelectors {
-			rs.Iterate(func(s *model.ResultSelector) {
-				selectorJS := s.CSSSelectorToJS(runtimeVars)
-
-				if rs.Selector.HTMLAttribute != nil {
-					selectorJS = s.AddHTMLAttributeSelector(selectorJS, runtimeVars)
-				} else {
-					selectorJS = s.AddInnerHTMLSelector(selectorJS, runtimeVars)
-				}
-
-				selectorJS += ".join(';;')"
-				log.Println(selectorJS)
-
-				tasks = append(tasks, cdp.EvaluateAsDevTools(selectorJS, &s.Result))
-			})
-		}
-	}
-
-	return tasks
-}
-
-func (c *chrome) generateOutput(resultMapping []*model.ResultOutputCollectionMap) (output map[string]interface{}) {
-	output = make(map[string]interface{})
-	for _, m := range resultMapping {
-		collection := m.Name
-		if m.Key != nil {
-			collection = *m.Key
-		}
-
-		data := make(map[string]interface{})
-
-		for _, rs := range m.ResultSelectors {
-			values := rs.GetResultJSONArray()
-			data[rs.Selector.Key] = values
-		}
-
-		data["collection"] = m.Name
-
-		output[collection] = data
-	}
-	return output
 }
