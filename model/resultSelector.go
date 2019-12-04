@@ -52,7 +52,10 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 				} else if (typeof result === 'object') {
 					if (removeDefaultValueKeys) delete result.__value
 					delete result.node
-					Object.keys(result).forEach(key => cleanup(result[key]))
+					Object.keys(result).forEach(key => {
+						if (result[key]) result[key] = result[key].trim()
+						cleanup(result[key])
+					})
 				}
 			}
 		}; 
@@ -66,15 +69,20 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 		case SelectorTypeObjectArray:
 			jsString += `.map(node => ({ __value: node, node: node }))`
 			jsString += s.getResultNodeMutations(``)
+			jsString += s.getResultRegexMutations(``)
 			for _, ss := range s.SubSelectors {
 				jsString += s.getSubSelectorJS(ss, s.Selector.Type, runtimeVars, hideDefaultValueKeys)
 			}
 		case SelectorTypeStringArray:
 			jsString += s.getResultNodeMutations(`.map(node => ({ node: node }))`)
+			jsString += s.getResultRegexMutations(``)
 		case SelectorTypeObjectProp:
 			jsString += `.reduce((prev, next) => [{ __value: prev[0].__value + next.innerHTML }], [{ __value: "" }])`
+			jsString += s.getResultRegexMutations(``)
 		case SelectorTypeStringProp:
-			jsString += `.map(node => node.innerHTML).join('')`
+			jsString += `.map(node => node.innerHTML)`
+			jsString += s.getResultRegexMutations(``)
+			jsString += `.join('')`
 		}
 	}
 
@@ -84,10 +92,19 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 			if s.Selector.CSSSelector != nil {
 				jsString += fmt.Sprintf(`Array.from(object.node.querySelectorAll("%s")).map(node => ({ __value: node, node: node }))`, *s.Selector.CSSSelector)
 				jsString += s.getResultNodeMutations(``)
+				jsString += s.getResultRegexMutations(``)
 			} else {
 				jsString += s.getResultNodeMutations(`[object]`)
+				jsString += s.getResultRegexMutations(``)
 			}
 		}
+	}
+
+	switch s.Selector.Type {
+	case SelectorTypeObjectProp:
+		fallthrough
+	case SelectorTypeStringProp:
+		jsString += `.pop()`
 	}
 
 	if isRootSelector {
@@ -129,16 +146,37 @@ func (s *ResultSelector) getResultNodeMutations(startCode string) (jsString stri
 		}
 	case SelectorTypeObjectProp:
 		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => ({ __value: object.node.getAttribute("%s") })).pop()`, *s.Selector.HTMLAttribute)
+			jsString += fmt.Sprintf(`.map(object => ({ __value: object.node.getAttribute("%s") }))`, *s.Selector.HTMLAttribute)
 		} else {
-			jsString += `.map(object => ({ __value: object.node.innerHTML })).pop()`
+			jsString += `.map(object => ({ __value: object.node.innerHTML }))`
 		}
 	case SelectorTypeStringProp:
 		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => object.node.getAttribute("%s")).pop()`, *s.Selector.HTMLAttribute)
+			jsString += fmt.Sprintf(`.map(object => object.node.getAttribute("%s"))`, *s.Selector.HTMLAttribute)
 		} else {
-			jsString += `.map(object => object.node.innerHTML).pop()`
+			jsString += `.map(object => object.node.innerHTML)`
 		}
+	}
+
+	return jsString
+}
+
+func (s *ResultSelector) getResultRegexMutations(startCode string) (jsString string) {
+	jsString += startCode
+
+	if s.Selector.Regex != nil {
+		switch s.Selector.Type {
+		case SelectorTypeObjectArray:
+			jsString += fmt.Sprintf(`.map(object => ({ ...object, __value: object.__value.match(%s) }))`, *s.Selector.Regex)
+		case SelectorTypeStringArray:
+			jsString += fmt.Sprintf(`.map(str => str.match(%s))`, *s.Selector.Regex)
+		case SelectorTypeObjectProp:
+			jsString += fmt.Sprintf(`.map(object => ({ __value: object.__value.match(%s) }))`, *s.Selector.Regex)
+		case SelectorTypeStringProp:
+			jsString += fmt.Sprintf(`.map(str => str.match(%s))`, *s.Selector.Regex)
+		}
+
+		jsString += `.filter(n => n).map(matches => matches.pop())`
 	}
 
 	return jsString
