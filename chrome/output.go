@@ -11,7 +11,7 @@ func (c *chrome) CollectDataCDPTasks(runtimeVars []*model.RuntimeVar, mapping []
 	var tasks cdp.Tasks
 	for _, m := range mapping {
 		for _, rs := range m.ResultSelectors {
-			selectorJS := rs.GetJS(runtimeVars, "")
+			selectorJS := rs.GetJS(runtimeVars, "", m.HideDefaultValueKeys)
 
 			log.Println(selectorJS)
 
