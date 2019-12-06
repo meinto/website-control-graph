@@ -43,27 +43,27 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 	isRootSelector := !parantType.IsValid()
 
 	if isRootSelector {
-		jsString += `
-		let removeDefaultValueKeys = false;
-		function cleanup(result) {
-			if (result) {
-				if (result.forEach !== undefined) {
-					result.forEach(cleanup)
-				} else if (typeof result === 'object') {
-					if (removeDefaultValueKeys) delete result.__value
-					delete result.node
-					Object.keys(result).forEach(key => {
-						if (result[key]) result[key] = result[key].trim()
-						cleanup(result[key])
-					})
+		jsString += fmt.Sprintf(`
+			let removeDefaultValueKeys_%s = false;
+			function cleanup_%s(result) {
+				if (result) {
+					if (result.forEach !== undefined) {
+						result.forEach(cleanup_%s)
+					} else if (typeof result === 'object') {
+						if (removeDefaultValueKeys_%s) delete result.__value
+						delete result.node
+						Object.keys(result).forEach(key => {
+							if (result[key]) result[key] = result[key].trim()
+							cleanup_%s(result[key])
+						})
+					}
 				}
-			}
-		}; 
-		`
+			}; 
+		`, s.Selector.Key, s.Selector.Key, s.Selector.Key, s.Selector.Key, s.Selector.Key)
 	}
 
 	if isRootSelector && s.Selector.CSSSelector != nil {
-		jsString += fmt.Sprintf(`const result = Array.from(document.querySelectorAll("%s"))`, *s.Selector.CSSSelector)
+		jsString += fmt.Sprintf(`const %s = Array.from(document.querySelectorAll("%s"))`, s.Selector.Key, *s.Selector.CSSSelector)
 
 		switch s.Selector.Type {
 		case SelectorTypeObjectArray:
@@ -109,9 +109,9 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 
 	if isRootSelector {
 		if hideDefaultValueKeys != nil && *hideDefaultValueKeys {
-			jsString += `; removeDefaultValueKeys = true`
+			jsString += fmt.Sprintf(`; removeDefaultValueKeys_%s = true`, s.Selector.Key)
 		}
-		jsString += `; cleanup(result); result`
+		jsString += fmt.Sprintf(`; cleanup_%s(%s); %s`, s.Selector.Key, s.Selector.Key, s.Selector.Key)
 	}
 
 	return ReplaceRuntimeTemplates(runtimeVars, jsString)

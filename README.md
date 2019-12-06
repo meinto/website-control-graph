@@ -24,18 +24,23 @@ query {
     ]
     output: [
       {
-        element: "h1"
-        key: "h1-list"
-      }
-      {
-        element: "h2 .mw-headline"
-        key: "h2-list"
+        name: "Überschriften"
+        selectors: [
+          {
+            type: string_array
+            cssSelector: "h1"
+            key: "headline1"
+          }
+          {
+            type: string_array
+            cssSelector: "h2"
+            key: "headline2"
+          }
+        ]
       }
     ]
   ) {
-    output {
-      value
-    }
+    output
   }
 }
 ```
@@ -77,17 +82,12 @@ query {
     ]
     output: [
       {
-        element: "p.content-you-want-to-query"
-        key: "contentList"
+        name: "Name of collection",
+        selectors: [ ... ]
       }
     ]
   ) {
-    output {
-      key
-      value
-      index
-      element
-    }
+    output
   }
 }
 ```
