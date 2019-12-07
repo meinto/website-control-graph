@@ -65,48 +65,43 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 		`, s.Selector.Key, s.Selector.Key, s.Selector.Key, s.Selector.Key, s.Selector.Key)
 	}
 
+	if isRootSelector {
+		jsString += fmt.Sprintf(`const %s = `, s.Selector.Key)
+	}
+
 	if isRootSelector && s.Selector.CSSSelector != nil {
-		jsString += fmt.Sprintf(`const %s = Array.from(document.querySelectorAll("%s"))`, s.Selector.Key, *s.Selector.CSSSelector)
+		if s.Selector.Type == SelectorTypeObjectArray || s.Selector.Type == SelectorTypeStringArray {
+			jsString += fmt.Sprintf(`Array.from(document.querySelectorAll("%s"))`, *s.Selector.CSSSelector)
+		} else if s.Selector.Type == SelectorTypeObjectProp || s.Selector.Type == SelectorTypeStringProp {
+			jsString += fmt.Sprintf(`[document.querySelector("%s")]`, *s.Selector.CSSSelector)
+		}
+		jsString += `.map(node => ({ __value: node, node: node }))`
 
-		switch s.Selector.Type {
-		case SelectorTypeObjectArray:
-			jsString += `.map(node => ({ __value: node, node: node }))`
-			jsString += s.getResultNodeMutations(``)
-			jsString += s.getResultRegexMutations(``)
-			for _, ss := range s.SubSelectors {
-				jsString += s.getSubSelectorJS(ss, s.Selector.Type, runtimeVars, hideDefaultValueKeys)
-			}
-		case SelectorTypeStringArray:
-			jsString += s.getResultNodeMutations(`.map(node => ({ node: node }))`)
-			jsString += s.getResultRegexMutations(``)
-		case SelectorTypeObjectProp:
-			jsString += `.reduce((prev, next) => [{ __value: prev[0].__value + next.innerHTML }], [{ __value: "" }])`
-			jsString += s.getResultRegexMutations(``)
-		case SelectorTypeStringProp:
-			jsString += `.map(node => node.innerHTML)`
-			jsString += s.getResultRegexMutations(``)
-			jsString += `.join('')`
+	} else if !isRootSelector && s.Selector.CSSSelector != nil {
+		if s.Selector.Type == SelectorTypeObjectArray || s.Selector.Type == SelectorTypeStringArray {
+			jsString += fmt.Sprintf(`Array.from(object.node.querySelectorAll("%s"))`, *s.Selector.CSSSelector)
+		} else if s.Selector.Type == SelectorTypeObjectProp || s.Selector.Type == SelectorTypeStringProp {
+			jsString += fmt.Sprintf(`[object.node.querySelector("%s")]`, *s.Selector.CSSSelector)
+		}
+		jsString += `.map(node => ({ __value: node, node: node }))`
+	} else if !isRootSelector {
+		jsString += `[object]`
+	}
+
+	jsString += s.getResultNodeMutations()
+	jsString += s.getResultRegexMutations()
+
+	if s.Selector.Type == SelectorTypeStringArray || s.Selector.Type == SelectorTypeStringProp {
+		jsString += `.map(object => object.__value)`
+	}
+
+	if s.Selector.Type == SelectorTypeObjectArray || s.Selector.Type == SelectorTypeObjectProp {
+		for _, ss := range s.SubSelectors {
+			jsString += ss.subSelectorJS(s.Selector.Type, runtimeVars, hideDefaultValueKeys)
 		}
 	}
 
-	if !isRootSelector {
-		switch parantType {
-		case SelectorTypeObjectArray:
-			if s.Selector.CSSSelector != nil {
-				jsString += fmt.Sprintf(`Array.from(object.node.querySelectorAll("%s")).map(node => ({ __value: node, node: node }))`, *s.Selector.CSSSelector)
-				jsString += s.getResultNodeMutations(``)
-				jsString += s.getResultRegexMutations(``)
-			} else {
-				jsString += s.getResultNodeMutations(`[object]`)
-				jsString += s.getResultRegexMutations(``)
-			}
-		}
-	}
-
-	switch s.Selector.Type {
-	case SelectorTypeObjectProp:
-		fallthrough
-	case SelectorTypeStringProp:
+	if s.Selector.Type == SelectorTypeObjectProp || s.Selector.Type == SelectorTypeStringProp {
 		jsString += `.pop()`
 	}
 
@@ -120,67 +115,22 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 	return ReplaceRuntimeTemplates(runtimeVars, jsString)
 }
 
-func (s *ResultSelector) getSubSelectorJS(subSelector *ResultSelector, parantType SelectorType, runtimeVars []*RuntimeVar, hideDefaultValueKeys *bool) (jsString string) {
+func (s *ResultSelector) subSelectorJS(parantType SelectorType, runtimeVars []*RuntimeVar, hideDefaultValueKeys *bool) (jsString string) {
+	return fmt.Sprintf(`.map(object => ({ ...object, %s: %s }))`, s.Selector.Key, s.GetJS(runtimeVars, parantType, hideDefaultValueKeys))
+}
 
-	switch parantType {
-	case SelectorTypeObjectArray:
-		jsString += fmt.Sprintf(`.map(object => ({ ...object, %s: %s }))`, subSelector.Selector.Key, subSelector.GetJS(runtimeVars, parantType, hideDefaultValueKeys))
+func (s *ResultSelector) getResultNodeMutations() (jsString string) {
+	if s.Selector.HTMLAttribute != nil {
+		jsString += fmt.Sprintf(`.map(object => ({ ...object, __value: object.node.getAttribute("%s") }))`, *s.Selector.HTMLAttribute)
+	} else {
+		jsString += `.map(object => ({ ...object, __value: object.node.innerHTML }))`
 	}
-
 	return jsString
 }
 
-func (s *ResultSelector) getResultNodeMutations(startCode string) (jsString string) {
-
-	jsString += startCode
-
-	switch s.Selector.Type {
-	case SelectorTypeObjectArray:
-		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => ({ node: object.node, __value: object.node.getAttribute("%s") }))`, *s.Selector.HTMLAttribute)
-		} else {
-			jsString += `.map(object => ({ node: object.node, __value: object.node.innerHTML }))`
-		}
-	case SelectorTypeStringArray:
-		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => object.node.getAttribute("%s"))`, *s.Selector.HTMLAttribute)
-		} else {
-			jsString += `.map(object => object.node.innerHTML)`
-		}
-	case SelectorTypeObjectProp:
-		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => ({ __value: object.node.getAttribute("%s") }))`, *s.Selector.HTMLAttribute)
-		} else {
-			jsString += `.map(object => ({ __value: object.node.innerHTML }))`
-		}
-	case SelectorTypeStringProp:
-		if s.Selector.HTMLAttribute != nil {
-			jsString += fmt.Sprintf(`.map(object => object.node.getAttribute("%s"))`, *s.Selector.HTMLAttribute)
-		} else {
-			jsString += `.map(object => object.node.innerHTML)`
-		}
-	}
-
-	return jsString
-}
-
-func (s *ResultSelector) getResultRegexMutations(startCode string) (jsString string) {
-	jsString += startCode
-
+func (s *ResultSelector) getResultRegexMutations() (jsString string) {
 	if s.Selector.Regex != nil {
-		switch s.Selector.Type {
-		case SelectorTypeObjectArray:
-			jsString += fmt.Sprintf(`.map(object => ({ ...object, __value: object.__value.match(%s) }))`, *s.Selector.Regex)
-		case SelectorTypeStringArray:
-			jsString += fmt.Sprintf(`.map(str => str.match(%s))`, *s.Selector.Regex)
-		case SelectorTypeObjectProp:
-			jsString += fmt.Sprintf(`.map(object => ({ __value: object.__value.match(%s) }))`, *s.Selector.Regex)
-		case SelectorTypeStringProp:
-			jsString += fmt.Sprintf(`.map(str => str.match(%s))`, *s.Selector.Regex)
-		}
-
-		jsString += `.filter(n => n).map(matches => matches.pop())`
+		jsString += fmt.Sprintf(`.map(object => ({ ...object, __value: [object.__value.match(%s)].filter(n => n).map(matches => matches.pop()).pop() }))`, *s.Selector.Regex)
 	}
-
 	return jsString
 }
