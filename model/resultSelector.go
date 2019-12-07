@@ -14,7 +14,10 @@ func NewResultSelector(s Selector) *ResultSelector {
 	if s.SubSelectors != nil {
 		var subSelectors []*ResultSelector
 		for _, ss := range s.SubSelectors {
-			subSelectors = append(subSelectors, NewResultSelector(ss))
+			if ss != nil {
+				resultSelector := NewResultSelector(*ss)
+				subSelectors = append(subSelectors, resultSelector)
+			}
 		}
 		return &ResultSelector{
 			s,
@@ -53,7 +56,7 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 						if (removeDefaultValueKeys_%s) delete result.__value
 						delete result.node
 						Object.keys(result).forEach(key => {
-							if (result[key]) result[key] = result[key].trim()
+							if (result[key] && typeof result[key] === 'string') result[key] = result[key].trim()
 							cleanup_%s(result[key])
 						})
 					}

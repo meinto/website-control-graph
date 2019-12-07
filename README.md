@@ -103,16 +103,24 @@ query {
       {navigate:"https://en.wikipedia.org/wiki/%22Hello,_World!%22_program"},
       {waitVisible:"h1"}
       {runtimeVar: {                              # store the link to Hello_World_(disambiguation) page
-        attribute: "href"
-        element: ".mw-disambig"
+        cssSelector: ".mw-disambig"
+        HTMLAttribute: "href"
+        key: "runtimevar"
+        type: string_prop
       }}
       {navigate:"https://en.wikipedia.org$0"},    # use the link to Hello_World_(disambiguation) page ($0)
       {waitVisible:"h1"}
     ]
     output: [
       {
-        element: "h1"
-        key: "h1-list"
+        name: "Überschriften"
+        selectors: [
+          {
+            type: string_array
+            cssSelector: "h1"
+            key: "headline1"
+          }
+        ]
       }
     ]
   ) {
@@ -120,9 +128,7 @@ query {
       name
       value
     }
-    output {
-      value
-    }
+    output
   }
 }
 ```

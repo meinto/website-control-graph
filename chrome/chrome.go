@@ -78,8 +78,10 @@ func (c *chrome) Run(actions []*model.Action, mapping []*model.OutputCollectionM
 	for _, m := range mapping {
 		var resultSelectors []*model.ResultSelector
 		for _, s := range m.Selectors {
-			rs := model.NewResultSelector(s)
-			resultSelectors = append(resultSelectors, rs)
+			if s != nil {
+				rs := model.NewResultSelector(*s)
+				resultSelectors = append(resultSelectors, rs)
+			}
 		}
 		resultMapping = append(resultMapping, &model.ResultOutputCollectionMap{
 			OutputCollectionMap: *m,

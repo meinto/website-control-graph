@@ -12,7 +12,7 @@ input OutputCollectionMap {
   # If not set the collection name will be choosen for this
   key: String
   hideDefaultValueKeys: Boolean
-  selectors: [Selector!]!
+  selectors: [Selector]!
 }
 
 type RuntimeVar {
