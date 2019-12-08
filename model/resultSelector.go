@@ -75,7 +75,7 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 		} else if s.Selector.Type == SelectorTypeObjectProp || s.Selector.Type == SelectorTypeStringProp {
 			jsString += fmt.Sprintf(`[document.querySelector("%s")]`, *s.Selector.CSSSelector)
 		}
-		jsString += `.map(node => ({ __value: node, node: node }))`
+		jsString += `.filter(node => node).map(node => ({ __value: node, node: node }))`
 
 	} else if !isRootSelector && s.Selector.CSSSelector != nil {
 		if s.Selector.Type == SelectorTypeObjectArray || s.Selector.Type == SelectorTypeStringArray {
@@ -83,7 +83,7 @@ func (s *ResultSelector) GetJS(runtimeVars []*RuntimeVar, parantType SelectorTyp
 		} else if s.Selector.Type == SelectorTypeObjectProp || s.Selector.Type == SelectorTypeStringProp {
 			jsString += fmt.Sprintf(`[object.node.querySelector("%s")]`, *s.Selector.CSSSelector)
 		}
-		jsString += `.map(node => ({ __value: node, node: node }))`
+		jsString += `.filter(node => node).map(node => ({ __value: node, node: node }))`
 	} else if !isRootSelector {
 		jsString += `[object]`
 	}
