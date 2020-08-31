@@ -46,11 +46,16 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 		cdp.NoDefaultBrowserCheck,
 		cdp.Headless,
 		cdp.DisableGPU,
+		cdp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36"),
+		cdp.WindowSize(1600, 1200),
 	}
 	if DockerBuild == "yes" {
 		allocatorOpts = append(allocatorOpts, cdp.ExecPath("/headless-shell/headless-shell"))
 	}
-	ctx, _ := cdp.NewExecAllocator(context.Background(), allocatorOpts...)
+	ctx, _ := cdp.NewExecAllocator(
+		context.Background(),
+		allocatorOpts...,
+	)
 
 	cdpContextOpts := []cdp.ContextOption{}
 	if ShouldLog == "yes" {
