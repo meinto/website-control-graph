@@ -3,6 +3,7 @@ package chrome
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	cdp "github.com/chromedp/chromedp"
@@ -52,6 +53,12 @@ func (c *chrome) CreateContext() (context.Context, context.CancelFunc) {
 	if DockerBuild == "yes" {
 		allocatorOpts = append(allocatorOpts, cdp.ExecPath("/headless-shell/headless-shell"))
 	}
+
+	httpProxy, httpProxySet := os.LookupEnv("CONTROL_GRAPH_HTTP_PROXY")
+	if httpProxySet {
+		allocatorOpts = append(allocatorOpts, cdp.ProxyServer(httpProxy))
+	}
+
 	ctx, _ := cdp.NewExecAllocator(
 		context.Background(),
 		allocatorOpts...,
